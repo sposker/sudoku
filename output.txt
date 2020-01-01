@@ -1,0 +1,17 @@
+<kivy.core.window.Keyboard object at 0x000002B69DA83588> (304, 'shift') İ ['shift']
+<kivy.core.window.Keyboard object at 0x000002B69DA83588> (9, 'tab') None []
+(6, 7)
+(7, 7)
+<kivy.core.window.Keyboard object at 0x000002B69DA83588> (260, 'numpad4') Ą []
+<kivy.core.window.Keyboard object at 0x000002B69DA83588> (264, 'numpad8') Ĉ []
+<kivy.core.window.Keyboard object at 0x000002B69DA83588> (262, 'numpad6') Ć []
+<kivy.core.window.Keyboard object at 0x000002B69DA83588> (258, 'numpad2') Ă []
+<kivy.core.window.Keyboard object at 0x000002B69DA83588> (273, 'up') None []
+<kivy.core.window.Keyboard object at 0x000002B69DA83588> (276, 'left') None []
+<kivy.core.window.Keyboard object at 0x000002B69DA83588> (274, 'down') None []
+<kivy.core.window.Keyboard object at 0x000002B69DA83588> (275, 'right') None []
+
+<kivy.core.window.Keyboard object at 0x000002772A8B45F8> (304, 'shift') İ ['shift']
+<kivy.core.window.Keyboard object at 0x000002772A8B45F8> (303, 'rshift') į ['shift']
+
+<kivy.core.window.Keyboard object at 0x000002772A8B45F8> (51, '3') 3 ['numlock']

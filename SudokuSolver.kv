@@ -1,0 +1,232 @@
+#:kivy 1.11.1
+#:import Factory kivy.factory.Factory
+
+<TaskButton>
+
+    pos_hint: {'y': .2}
+    on_release:
+        self.task_button_callback(self.parent.button_text)
+
+
+<PanelToggle>
+    size_hint: .25, .85
+    background_color: app.lh_color_list
+    background_down: app.dh_color_string
+    color: app.text_color_list
+    font_size: 18
+
+<TaskButtonGrid@GridLayout>
+
+    cols: 3
+
+    size_hint: .9, .35
+    pos_hint: {'x': .05, 'y':.1}
+
+    TaskButtonLayout:
+        button_text: 'Hint'
+        image_path: 'src/64lightbulb.png'
+
+    TaskButtonLayout:
+        button_text: 'Show Hotkeys'
+        image_path: 'src/64ctrl.png'
+
+    TaskButtonLayout:
+        button_text: 'Open Puzzle'
+        image_path: 'src/64open.png'
+
+    TaskButtonLayout:
+        button_text: 'Solve'
+        image_path: 'src/64puzzle.png'
+
+    TaskButtonLayout:
+        button_text: 'Reset'
+        image_path: 'src/64restart.png'
+
+    TaskButtonLayout:
+        button_text: 'Settings'
+        image_path: 'src/64settings.png'
+
+<TaskButtonLayout>
+
+    canvas.before:
+        Color:
+            rgba: app.bg_color
+        Line:
+            width: 2
+            rectangle: self.x, self.y, self.width, self.height
+
+    size_hint: .28, .15
+
+    TaskButton:
+        size_hint: 1, .8
+        pos_hint: {'x': 0, 'y': .2}
+        source:
+            root.image_path
+
+    Label:
+        size_hint: 1, .2
+        background_color: app.trans
+        pos_hint: {'x': 0, 'y': .05}
+        text: root.button_text
+        color: app.text_color
+        font_size: 18
+
+<ToggleLayout>
+    canvas.before:
+        Color:
+            rgba: app.bg_color
+        Rectangle:
+            size: self.size
+            pos: self.pos
+
+    size_hint: .9, .12
+
+    Label:
+        size_hint: .5, 1
+        pos_hint: {'x': 0, 'y': 0}
+        color: app.text_color
+        text: self.parent.pair_name
+        font_size: 18
+#        halign: 'left'
+
+    PanelToggle:
+        group: self.parent.pair_name
+        text: 'Off'
+        pos_hint: {'x': .5, 'y': 0.05}
+        state: 'down'
+
+    PanelToggle:
+        group: self.parent.pair_name
+        text: 'On'
+        pos_hint: {'x': .75, 'y': 0.05}
+
+
+
+
+<Panel>
+    canvas.before:
+        Color:
+            rgba: app.elem_color
+        Rectangle:
+            size: self.size
+            pos: self.pos
+
+    Image:
+        size_hint: None, .225
+        size: self.height, self.height
+
+        pos_hint: {'x': .05, 'y': .75}
+        source:
+            'src/Sudoku150.png'
+
+
+
+
+    Label:
+        color: 0,0,0,1
+        text: "Solving Sudokus\n  (with snakes)"
+        bold: True
+        font_size: 30
+        size_hint: .6, .15
+        pos_hint: {'x': .4, 'y': .775}
+
+
+    ToggleLayout:
+        pos_hint: {'x': .05, 'y': .6}
+        pair_name: 'Hotkey Toggle'
+    ToggleLayout:
+        pos_hint: {'x': .05, 'y': .475}
+        pair_name: 'Realtime Inspection'
+
+
+    TaskButtonGrid:
+
+
+<TileLabel>
+
+    background_color: app.trans
+    color: app.text_color
+    halign: 'center'
+    valign: 'middle'
+    font_size: 32
+    multiline: False
+    underline: True
+
+<Guesses>
+    background_color: app.trans
+    background_normal: ''
+    foreground_color: app.text_color if not self.locked else app.lh_color
+    cursor_color: app.text_color
+
+
+
+<TileInput>
+
+#    canvas.before:
+#        Color:
+#            rgba: (0,0,0,.01)
+#        Rectangle:
+#            size: self.size
+#            pos: self.pos
+
+    background_color: app.trans
+    background_normal: ''
+    foreground_color: app.text_color if not self.locked else app.lh_color
+    cursor_color: app.text_color
+    halign: 'center'
+    valign: 'middle'
+    font_size: 32
+    multiline: False
+    selection_color: (1,1,1,.4)
+    write_tab: False
+
+<TileBackground>
+    canvas.before:
+        Color:
+            rgba: app.bg_color
+        Rectangle:
+            size: [s-4 for s in self.size]
+            pos: [s+2 for s in self.pos]
+
+
+<ThreeBy>
+
+    cols: 3
+
+#    canvas.before:
+#        Color:
+#            rgba: app.bg_color
+#        Rectangle:
+#            size: [s/3 for s in self.size]
+#            pos: [s+1/3*self.height for s in self.pos]
+
+
+<NineBy>
+
+    canvas.before:
+        Color:
+            rgba: app.elem_color
+        Rectangle:
+            size: self.size
+            pos: self.pos
+
+
+<Main>:
+    canvas:
+        Color:
+            rgba: app.bg_color
+        Rectangle:
+            size: self.size
+            pos: self.pos
+
+    NineBy:
+        id: Nine
+        size_hint: None, .95
+        size: self.height, self.height
+        pos_hint: {'y': 0.025}
+        pos: (self.height * .025, self.y)
+
+    Panel:
+        size_hint: None, None
+        size: Nine.width / 1.618, Nine.height
+        pos: (Nine.width + Nine.x + 20, Nine.y)
