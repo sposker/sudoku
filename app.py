@@ -35,9 +35,7 @@ ITEM_ROW_HEIGHT = 72
 TEXT_BASE_SIZE = 40
 
 Window.size = (round(1440 * 1.618) / 2, 1440 / 2)
-
-
-# Window.borderless = True
+Window.borderless = True
 
 
 class TaskButton(ButtonBehavior, Image):
@@ -52,9 +50,18 @@ class TaskButton(ButtonBehavior, Image):
         'Settings': None,
     }
 
-    def task_button_callback(self, button_text):
-        print(button_text)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        app = App.get_running_app()
+        self.buttons['Solve'] = app.solve
+        self.buttons['Reset'] = app.reset
 
+    def task_button_callback(self, button_text):
+        try:
+            callback = self.buttons[button_text]
+            callback()
+        except TypeError:
+            print(button_text)
 
 class TaskButtonLayout(FloatLayout):
     """Layout for single buttons and names"""
@@ -565,6 +572,22 @@ class SudokuSolverApp(App):
             label = Tile.tiles[pos].label
             label.color = self.text_color
             return pos
+
+    def solve(self):
+        self.board.solve()
+        for pos, tile in self.board.tiles.items():
+            val = tile.value
+            Tile.tiles[pos].label.text = str(val)
+            Tile.tiles[pos].label.color = (.1, .6, .1, 1)
+            Tile.tiles[pos].input.text = str(val)
+
+    def reset(self):
+        self.board.reset()
+        for pos, tile in self.board.tiles.items():
+            val = tile.value
+            Tile.tiles[pos].label.text = str(val) if val else ''
+            Tile.tiles[pos].label.color = self.text_color
+            Tile.tiles[pos].input.text = ''
 
     def set_board(self, board: classes.Board):
         ...

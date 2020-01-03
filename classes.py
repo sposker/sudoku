@@ -91,9 +91,9 @@ class Board:
 
     def _solve_iteration(self, tiles):
         tile = tiles.pop()
-        for i in range(9):
+        for i in range(1, 10):
             tile.value = i
-            if self.validate(tile):
+            if not self.validate(tile):
                 try:
                     x = self._solve_iteration(tiles)
                 except IndexError:  # Empty list
