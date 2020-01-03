@@ -1,5 +1,5 @@
 from kivy.app import App
-from kivy.clock import Clock
+from kivy.clock import Clock, mainthread
 from kivy.core.window import Window
 from kivy.core.text.markup import MarkupLabel
 from kivy.factory import Factory
@@ -23,6 +23,8 @@ from kivy.uix.togglebutton import ToggleButton
 import classes
 from __init__ import *
 import re
+import threading
+import time
 
 DARK_HIGHLIGHT = (0.1568627450980392, 0.16862745098039217, 0.18823529411764706, 1)  # Darkest Gray
 BACKGROUND_COLOR = (0.18823529411764706, 0.19215686274509805, 0.21176470588235294, 1)  # Dark gray
@@ -52,16 +54,20 @@ class TaskButton(ButtonBehavior, Image):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        Clock.schedule_once(self._register_callbacks)
+
+    def _register_callbacks(self, _):
         app = App.get_running_app()
-        self.buttons['Solve'] = app.solve
+        self.buttons['Solve'] = app.root.start_second_thread
         self.buttons['Reset'] = app.reset
 
     def task_button_callback(self, button_text):
         try:
             callback = self.buttons[button_text]
-            callback()
+            callback.__call__()
         except TypeError:
             print(button_text)
+
 
 class TaskButtonLayout(FloatLayout):
     """Layout for single buttons and names"""
@@ -505,6 +511,33 @@ class NineBy(FloatLayout):
 class Main(FloatLayout):
     """Main screen"""
 
+    stop = threading.Event()
+
+    def start_second_thread(self):
+        threading.Thread(target=self.second_thread).start()
+
+    def second_thread(self):
+        Clock.schedule_once(self.start_test, 0)
+        App.get_running_app().slow_solve()
+        self.stop_test()
+
+    def start_test(self, *args):
+        print('Starting slow solve')
+
+    @mainthread
+    def stop_test(self):
+        print('Solved!')
+        for tile in Tile.tiles.values():
+            tile.label.color = (.1, .6, .1, 1)
+
+    @mainthread
+    def update_values(self):
+        app = App.get_running_app()
+        board = app.board
+        for pos, _tile in board.tiles.items():
+            tile = Tile.tiles[pos]
+            tile.label.text = str(_tile.value) if _tile.value else ''
+
 
 class SudokuSolverApp(App):
     # Config Properties
@@ -537,8 +570,6 @@ class SudokuSolverApp(App):
     trans_list = [1, 1, 1, 0]
 
     hint_text_color = (0.6705882352941176, 0.6705882352941176, 0.6705882352941176, .1)
-    text_base_size = TEXT_BASE_SIZE
-    item_row_height = ITEM_ROW_HEIGHT
     board = {}
     tile_inputs = {}
 
@@ -581,6 +612,40 @@ class SudokuSolverApp(App):
             Tile.tiles[pos].label.color = (.1, .6, .1, 1)
             Tile.tiles[pos].input.text = str(val)
 
+    def slow_solve(self):
+
+        tiles = self.board.reset()
+        self._slow_solve(tiles)
+
+    def _slow_solve(self, tiles):
+        import time
+
+        tile = tiles.pop()
+        label = Tile.tiles[tile.position].label
+        label.color = (.1, .6, .1, 1)
+
+        for i in range(1, 10):
+            self.root.update_values()
+            # time.sleep(.0001)
+            tile.value = i
+            print(i)
+
+            if not self.board.validate(tile):
+                label.color = self.text_color
+                try:
+                    x = self._slow_solve(tiles)
+                except IndexError:  # Empty list
+                    return True
+                else:
+                    if x:
+                        return x
+                    else:
+                        label.color = (.1, .6, .1, 1)
+
+        else:
+            tile.value = None
+            tiles.append(tile)
+
     def reset(self):
         self.board.reset()
         for pos, tile in self.board.tiles.items():
@@ -592,6 +657,11 @@ class SudokuSolverApp(App):
     def set_board(self, board: classes.Board):
         ...
 
+    def on_stop(self):
+        # The Kivy event loop is about to stop, set a stop signal;
+        # otherwise the app window will close, but the Python process will
+        # keep running until all secondary threads exit.
+        self.root.stop.set()
 
 if __name__ == '__main__':
     SudokuSolverApp().run()
