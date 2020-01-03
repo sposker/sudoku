@@ -12,7 +12,7 @@ from kivy.uix.gridlayout import GridLayout
 from kivy.uix.image import Image
 from kivy.uix.label import Label
 from kivy.uix.popup import Popup
-from kivy.properties import StringProperty, ObjectProperty
+from kivy.properties import StringProperty, ObjectProperty, ListProperty
 from kivy.uix.floatlayout import FloatLayout
 from kivy.uix.relativelayout import RelativeLayout
 from kivy.uix.scrollview import ScrollView
@@ -36,7 +36,8 @@ TEXT_BASE_SIZE = 40
 
 Window.size = (round(1440 * 1.618) / 2, 1440 / 2)
 
-Window.borderless = True
+
+# Window.borderless = True
 
 
 class TaskButton(ButtonBehavior, Image):
@@ -66,6 +67,41 @@ class ToggleLayout(FloatLayout):
     """Layout that holds pairs of toggle buttons"""
 
     pair_name = StringProperty()
+    toggle_on_cb = ObjectProperty()
+    toggle_off_cb = ObjectProperty()
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+        self.guides_on = NineBy.instance.guides_on
+        self.guides_off = NineBy.instance.guides_off
+
+    @staticmethod
+    def inspections_on():
+        app = App.get_running_app()
+        setattr(app, 'inspections', True)
+        conflicts = set()
+        for tile in app.board.tiles.values():
+            _conflicts = app.board.validate(tile)
+            conflicts = conflicts | _conflicts
+
+        if None in conflicts:
+            conflicts.remove(None)
+
+        for pos in conflicts:
+            tile = Tile.tiles[pos]
+            tile.label.color = (.6, .1, .1, 1)
+        Tile.conflicts = conflicts
+
+    @staticmethod
+    def inspections_off():
+        app = App.get_running_app()
+        setattr(app, 'inspections', False)
+        if Tile.conflicts:
+            for pos in Tile.conflicts:
+                tile = Tile.tiles[pos]
+                tile.label.color = app.text_color
+        Tile.conflicts = None
 
 
 class PanelToggle(ToggleButton):
@@ -82,19 +118,130 @@ class Panel(FloatLayout):
     """Holds buttons on sidebar"""
 
 
-class TileBackground(Label):
-    """Background for number entry tiles"""
+class Tile(FloatLayout):
+    """Tile holding various widgets for sudoku tile functionality"""
+
+    tiles = {}
+    conflicts = None
+
+    def __init__(self, position, **kwargs):
+        self.locked = False
+        self.grid_position = position
+        super().__init__(**kwargs)
+
+        self.focus_next = self.focus_previous = None
+        self.directional_focus = {}
+        Tile.tiles[self.grid_position] = self
+
+        _h, _v = [(v - .005) * 3 for v in self.pos_hint.values()]
+
+        self.input = TileInput(size_hint=(.95, .95),
+                               pos_hint={'x': (2.5 * _h - _h * _h) * .005 + .025, 'y': _v * 0.005 - .125},
+                               )
+        self.input.bind(focus=lambda x, y: self.input.on_focus)
+        self.add_widget(self.input)
+
+        self.label = TileLabel(size_hint=(.95, .95),
+                               pos_hint={'x': 0.025, 'y': 0},
+                               )
+        self.add_widget(self.label)
+
+        self.guesses = TileGuesses(size_hint=(.95, .95),
+                                   pos_hint={'x': 0.025, 'y': 0.025},
+                                   )
+        self.add_widget(self.guesses)
+
+    def get_focus_next(self):
+        return self.focus_next
+
+    def get_focus_previous(self):
+        return self.focus_previous
+
+    def set_focus_behavior(self):
+
+        def calculate_next_focus(x, y):
+            dx_next = x + 1
+            dy_next = y
+
+            if dx_next == 9:
+                dx_next = 0
+                dy_next = y - 1
+
+            if dy_next == -1:
+                dy_next = 8
+
+            return dx_next, dy_next
+
+        def calculate_prev_focus(x, y):
+            dx_prev = x - 1
+            dy_prev = y
+
+            if dx_prev == -1:
+                dx_prev = 8
+                dy_prev = y + 1
+
+            if dy_prev == 9:
+                dy_prev = 0
+
+            return dx_prev, dy_prev
+
+        def calculate_directional_focus(x, y, delta: (int, int)):
+            dx = x + delta[0]
+            dy = y + delta[1]
+
+            if dx == -1:
+                dx = 8
+            elif dx == 9:
+                dx = 0
+            if dy == -1:
+                dy = 8
+            elif dy == 9:
+                dy = 0
+
+            return dx, dy
+
+        next_x, next_y = calculate_next_focus(*self.grid_position)
+        _next = Tile.tiles[(next_x, next_y)]
+
+        while _next.locked:
+            print(next_x, next_y)
+            next_x, next_y = calculate_next_focus(next_x, next_y)
+            _next = Tile.tiles[(next_x, next_y)]
+
+        self.focus_next = _next
+
+        prev_x, prev_y = calculate_prev_focus(*self.grid_position)
+        _prev = Tile.tiles[(prev_x, prev_y)]
+
+        while _prev.locked:
+            prev_x, prev_y = calculate_prev_focus(prev_x, prev_y)
+            _prev = Tile.tiles[(prev_x, prev_y)]
+
+        self.focus_previous = _prev
+
+        for direction in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
+            _x, _y = self.grid_position
+            next_x, next_y = calculate_directional_focus(_x, _y, direction)
+            _next = Tile.tiles[(next_x, next_y)]
+            while _next.locked:
+                next_x, next_y = calculate_directional_focus(next_x, next_y, direction)
+                _next = Tile.tiles[(next_x, next_y)]
+
+            self.directional_focus[direction] = _next
+
+        # print(f'self.grid_position={self.grid_position}, next.grid_position={self.focus_next.grid_position},'
+        #       f' previous.grid_position={self.focus_previous.grid_position}')
 
 
-class Guesses(TextInput):
-    """Notes for tiles"""
+class TileGuesses(GridLayout):
+    """Holds guesses"""
 
 
 class TileInput(TextInput):
     """Widget that allows setting values"""
 
     pat = re.compile('[^1-9]')
-    tile_inputs = {}
+
     num_codes = {
         (260, 'numpad4'): (-1, 0),
         (264, 'numpad8'): (0, 1),
@@ -108,58 +255,44 @@ class TileInput(TextInput):
         (275, 'right'): (1, 0),
     }
 
-    def __init__(self, grid_pos, label, locked=False, **kwargs):
-        self.grid_pos = grid_pos
-        self.label = label
-        self.locked = locked
-        self.tile_inputs[self.grid_pos] = self
+    app = None
+
+    def __init__(self, **kwargs):
+        self.locked = False
+        if not self.app:
+            self.app = App.get_running_app()
         super().__init__(**kwargs)
-
-    def find_next_focus(self, movement: (int, int)):
-        x, y = self.grid_pos
-        dx, dy = movement
-
-        new_x = new_y = None
-
-        if x + dx == -1:
-            new_x = 8
-        elif x + dx == 9:
-            new_x = 0
-        elif new_x is None:
-            new_x = x + dx
-
-        if y + dy == -1:
-            new_y = 8
-        elif y + dy == 9:
-            new_y = 0
-        elif new_y is None:
-            new_y = y + dy
-
-        w = self.tile_inputs[(new_x, new_y)]
-        if not w.locked:
-            w.focus = True
-        else:
-            w.find_next_focus(movement)
 
     def keyboard_on_key_down(self, window, keycode, text, modifiers):
 
         if 'numlock' not in modifiers and keycode in self.num_codes.keys():
-            self.find_next_focus(self.num_codes[keycode])
+            key = self.num_codes[keycode]
+            widget = self.parent.directional_focus[key]
+            self.focus = False
+            widget.input.focus = True
 
         elif keycode in self.codes.keys():
-            self.find_next_focus(self.codes[keycode])
+            key = self.codes[keycode]
+            widget = self.parent.directional_focus[key]
+            self.focus = False
+            widget.input.focus = True
 
-        elif 'shift' in modifiers and keycode == (9, 'tab'):
-            self.not_focus()
+        elif keycode == (13, 'enter'):
+            return super().keyboard_on_key_down(window, (9, 'tab'), text, modifiers)
 
-        super().keyboard_on_key_down(window, keycode, text, modifiers)
+        # elif 'shift' in modifiers and keycode == (9, 'tab'):
+        #     self.get_focus_previous()
+        else:
+            return super().keyboard_on_key_down(window, keycode, text, modifiers)
 
-    def _on_focus(self, instance, value, *largs):
-        super()._on_focus(instance, value, *largs)
-        print(self.grid_pos)
-        if self.locked:
-            w = self.get_focus_next()
-            w.focus = True
+    def on_focus(self, _, value):
+        if value:
+            self.opacity = 1
+            self.parent.label.opacity = 0
+            self._trigger_guides()
+        else:
+            self.opacity = 0
+            self.parent.label.opacity = 1
 
     def insert_text(self, substring, from_undo=False):
         pat = self.pat
@@ -168,122 +301,198 @@ class TileInput(TextInput):
         s = re.sub(pat, '', substring)
         return super(TileInput, self).insert_text(s, from_undo=from_undo)
 
-    def focus_helper(self, sign, end):
-
-        if self.grid_pos[0] == end:
-            if self.grid_pos[1] == end - 8:
-                return self.tile_inputs[0, 8]
-            else:
-                return self.tile_inputs[0, self.grid_pos[1] - sign]
-        else:
-            return self.tile_inputs[self.grid_pos[0] + sign, self.grid_pos[1]]  # TODO
-
     def get_focus_next(self):
-        print('focus')
-        return self.focus_helper(1, 8)
+        tile = self.parent.get_focus_next()
+        tile.input.focus = True
 
-    def not_focus(self):
-        print('not focus')
-        return self.focus_helper(-1, 8)
+    def get_focus_previous(self):
+        tile = self.parent.get_focus_previous()
+        tile.input.focus = True
 
-    def on_text_validate(self):
-        pass
+    def set_text(self, text):
+        setattr(self.parent.label, 'text', text)
+        conflicts = self.app.update_board(self.parent.grid_position, self.text)
+        if conflicts:
+            Tile.conflicts = conflicts
+            for pos in conflicts:
+                tile = Tile.tiles[pos]
+                tile.label.color = .6, .1, .1, 1
 
-    # def set_text(self):
-    #     # if self.defaults_button:
-    #         # hide_widget(self)
-    #         # hide_widget(self.defaults_button, dohide=False)
-    #         redraw_canvas(self.defaults_button, DARK_HIGHLIGHT)
-    #         self.defaults_button.text = self.text
-    #
-    # def on_text_validate(self):
-    #     redraw_canvas(self, DARK_HIGHLIGHT)
-    #     self.set_text()
-    #
-    # def _unbind_keyboard(self):
-    #     redraw_canvas(self, DARK_HIGHLIGHT)
-    #     super()._unbind_keyboard()
-    #     self.set_text()
+    def _unbind_keyboard(self):
+        self.set_text(self.text)
+        super()._unbind_keyboard()
+
+        if Tile.conflicts:
+            print(Tile.conflicts)
+            to_remove = {self.app.resolve_conflicts(pos) for pos in Tile.conflicts}
+            for elem in to_remove:
+                if elem in Tile.conflicts:
+                    Tile.conflicts.remove(elem)
+
+    def _trigger_guides(self):
+        NineBy.instance.trigger_guides(self.parent.grid_position)
 
 
 class TileLabel(Label):
-    """Label for fixed values"""
+    """Label displaying tiles' value"""
 
-    underline = True
 
-    def __init__(self, value, grid_pos, **kwargs):
+class RowGuide(Label):
+    def __init__(self, num, **kwargs):
         super().__init__(**kwargs)
-        self.grid_pos = grid_pos
-        self.text = str(value) if value else ''
+        self.row_pos = num
+
+
+class ColGuide(Label):
+
+    def __init__(self, num, **kwargs):
+        super().__init__(**kwargs)
+        self.col_pos = num
+
+
+class BoxGuide(Label):
+
+    def __init__(self, num, **kwargs):
+        super().__init__(**kwargs)
+        self.grid_pos = num
 
 
 class ThreeBy(FloatLayout):
-    """3x3 grid"""
+    """3x3 grid of tiles"""
 
     def __init__(self, grid_pos, **kwargs):
         self.grid_pos = grid_pos
         self._h_offset, self._v_offset = 3 * grid_pos[0], 3 * grid_pos[1]
         super().__init__(**kwargs)
 
-    def populate_backgrounds(self, **_):
-
-        for horiz in [0, 1, 2]:
-            for vert in [0, 1, 2]:
-                _h, _v = [i * 1 / 3 + .01 for i in [horiz, vert]]
-                _w = TileBackground()
-                self.add_widget(_w)
-                _w.size_hint = (.315, .315)
-                _w.pos_hint = {'x': _h, 'y': _v}
-
-    def populate_tiles(self, **_):
-        app = App.get_running_app()
-        for horiz in [0, 1, 2]:
-            for vert in [0, 1, 2]:
-                _h_pos, _v_pos = [i * 1 / 3 + .01 for i in [horiz, vert]]
+    def make_tiles(self, **_):
+        for vert in range(3):
+            for horiz in range(3):
                 coords = (self._h_offset + horiz, self._v_offset + vert)
-                lock = True if horiz == vert else False
+                _h, _v = [i * 1 / 3 + .005 for i in [horiz, vert]]
+                _w = Tile(coords,
+                          size_hint=(.321, .321),
+                          pos_hint={'x': _h, 'y': _v})
+                self.add_widget(_w)
 
-                try:
-                    if horiz == vert:
-                        value = 9
-                    else:
-                        value = app.board[coords]
-                except KeyError:
-                    tile_label = TileLabel(None, coords)
-                    tile_input = TileInput(coords, tile_label, locked=lock)
-                else:
-                    tile_label = TileLabel(value, coords)
-                    tile_input = TileInput(coords, tile_label, locked=lock)
+    def populate_tiles(self):
+        app = App.get_running_app()
+        for tile in self.children:
+            try:
+                value = app.board[tile.grid_position]
+            except KeyError:
+                value = None
 
-                TileInput.tile_inputs[coords] = tile_input
+            if value:
+                tile.label.text = str(value)
+                tile.label.underline = True
 
-                for widget in [tile_input, tile_label]:
-                    if widget:
-                        self.add_widget(widget)
-                        widget.size_hint = (.315, .315)
-                        y_offset = -.04 if isinstance(widget, TileInput) else 0
-                        widget.pos_hint = {'x': _h_pos, 'y': _v_pos + y_offset}
+                tile.input.locked = True
+                tile.input.disabled = True
+                tile.locked = True
 
 
 class NineBy(FloatLayout):
-    """9x9 board"""
+    """9x9 board containing 9 3x3 grids"""
 
     instance = None
 
     def __init__(self, **kw):
         super().__init__(**kw)
-        thirds = [0, 1, 2]
         NineBy.instance = self
+        self.guides = False
+        self.cols = {}
+        self.rows = {}
+        self.boxes = {}
+        self.add_col_guides()
+        self.add_row_guides()
+        self.add_box_guides()
 
-        for vert in thirds:
-            for horiz in thirds:
+        self.fill()
+        for widget in self.children:
+            try:
+                widget.populate_tiles()
+            except AttributeError:
+                pass
+        self.set_focus_behavior()
+
+    def fill(self):
+        for vert in range(3):
+            for horiz in range(3):
                 w = ThreeBy((horiz, vert))
                 self.add_widget(w)
-                w.populate_backgrounds()
-                w.populate_tiles()
-                w.size_hint = (.315, .315)
-                _h, _v = [i * 1 / 3 + .01 for i in [horiz, vert]]
+                w.make_tiles()
+                w.size_hint = (.321, .321)
+                _h, _v = [i * 1 / 3 + .005 for i in [horiz, vert]]
                 w.pos_hint = {'x': _h, 'y': _v}
+
+    def set_focus_behavior(self):
+        for grid in self.children:
+            for tile in grid.children:
+                tile.set_focus_behavior()
+
+    def add_col_guides(self):
+        for n in range(3):
+            for m in range(3):
+                guide = ColGuide(n)
+                guide.pos_hint = {'x': (3 * m + .975 * n + .35) * 1 / 9, 'y': .05}
+                self.add_widget(guide)
+                guide.opacity = 0
+                self.cols[3 * m + n] = guide
+
+    def add_row_guides(self):
+        for n in range(3):
+            for m in range(3):
+                guide = RowGuide(n)
+                guide.pos_hint = {'y': (3 * m + .975 * n + .35) * 1 / 9, 'x': .05}
+                self.add_widget(guide)
+                guide.opacity = 0
+                self.rows[3 * m + n] = guide
+
+    def add_box_guides(self):
+        for n in range(3):
+            for m in range(3):
+                guide = BoxGuide((n, m))
+                self.add_widget(guide)
+                _h, _v = [i * 1 / 3 + .005 for i in [n, m]]
+                guide.pos_hint = {'x': _h, 'y': _v}
+                guide.opacity = 0
+                for _x in [3 * n, 3 * n + 1, 3 * n + 2]:
+                    for _y in [3 * m, 3 * m + 1, 3 * m + 2]:
+                        self.boxes[(_x, _y)] = guide
+
+    def trigger_guides(self, pos: (int, int)):
+        if self.guides:
+            self._trigger_guides(pos)
+
+    def _trigger_guides(self, pos):
+        for row in self.rows.values():
+            row.opacity = 0
+        for col in self.cols.values():
+            col.opacity = 0
+        for box in self.boxes.values():
+            box.opacity = 0
+
+        row = self.rows[pos[1]]
+        col = self.cols[pos[0]]
+        box = self.boxes[pos]
+
+        row.opacity = 1
+        col.opacity = 1
+        box.opacity = 1
+
+    def guides_on(self):
+        self.guides = True
+
+    def guides_off(self):
+        self.guides = False
+
+        for row in self.rows.values():
+            row.opacity = 0
+        for col in self.cols.values():
+            col.opacity = 0
+        for box in self.boxes.values():
+            box.opacity = 0
 
 
 class Main(FloatLayout):
@@ -326,8 +535,36 @@ class SudokuSolverApp(App):
     board = {}
     tile_inputs = {}
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.inspections = False
+
     def build(self):
+        self.board = classes.b
         return Main()
+
+    def _set_board_value(self, pos, value):
+        tile = self.board.tiles[pos]
+        try:
+            tile.value = int(value)
+        except ValueError:
+            tile.value = None
+        return tile
+
+    def update_board(self, pos, value):
+        tile = self._set_board_value(pos, value)
+
+        if self.inspections:
+            return self.board.validate(tile)
+
+    def resolve_conflicts(self, pos):
+        tile = self.board.tiles[pos]
+        conflicts = self.board.validate(tile)
+        if not conflicts:
+            print('not conflicts')
+            label = Tile.tiles[pos].label
+            label.color = self.text_color
+            return pos
 
     def set_board(self, board: classes.Board):
         ...

@@ -52,14 +52,11 @@ def redraw_canvas(widget, color, corners=False):
 
 
 def hide_widget(wid, dohide=True):
-    if isinstance(wid, list):
-        for w in wid:
-            hide_widget(w, dohide=dohide)
-    else:
-        if hasattr(wid, 'saved_attrs'):
-            if not dohide:
-                wid.height, wid.size_hint_y, wid.opacity, wid.disabled = wid.saved_attrs
-                del wid.saved_attrs
-        elif dohide:
-            wid.saved_attrs = wid.height, wid.size_hint_y, wid.opacity, wid.disabled
-            wid.height, wid.size_hint_y, wid.opacity, wid.disabled = 0, None, 0, True
+    if hasattr(wid, 'saved_attrs'):
+        if not dohide:
+            wid.height, wid.size_hint_y, wid.opacity, wid.disabled = wid.saved_attrs
+            del wid.saved_attrs
+            print('widget visible')
+    elif dohide:
+        wid.saved_attrs = wid.height, wid.size_hint_y, wid.opacity, wid.disabled
+        wid.height, wid.size_hint_y, wid.opacity, wid.disabled = 0, None, 0, True

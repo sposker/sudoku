@@ -94,12 +94,16 @@
         text: 'Off'
         pos_hint: {'x': .5, 'y': 0.05}
         state: 'down'
+        on_release:
+            self.parent.toggle_off_cb()
+
 
     PanelToggle:
         group: self.parent.pair_name
         text: 'On'
         pos_hint: {'x': .75, 'y': 0.05}
-
+        on_release:
+            self.parent.toggle_on_cb()
 
 
 
@@ -133,10 +137,14 @@
 
     ToggleLayout:
         pos_hint: {'x': .05, 'y': .6}
-        pair_name: 'Hotkey Toggle'
+        pair_name: 'Show Guides'
+        toggle_on_cb: self.guides_on
+        toggle_off_cb: self.guides_off
     ToggleLayout:
         pos_hint: {'x': .05, 'y': .475}
         pair_name: 'Realtime Inspection'
+        toggle_on_cb: self.inspections_on
+        toggle_off_cb: self.inspections_off
 
 
     TaskButtonGrid:
@@ -150,28 +158,21 @@
     valign: 'middle'
     font_size: 32
     multiline: False
-    underline: True
 
-<Guesses>
+
+<TileGuesses>
     background_color: app.trans
     background_normal: ''
-    foreground_color: app.text_color if not self.locked else app.lh_color
+#    foreground_color: app.text_color if not self.locked else app.lh_color
     cursor_color: app.text_color
 
 
 
 <TileInput>
 
-#    canvas.before:
-#        Color:
-#            rgba: (0,0,0,.01)
-#        Rectangle:
-#            size: self.size
-#            pos: self.pos
-
     background_color: app.trans
     background_normal: ''
-    foreground_color: app.text_color if not self.locked else app.lh_color
+    foreground_color: app.text_color
     cursor_color: app.text_color
     halign: 'center'
     valign: 'middle'
@@ -180,7 +181,8 @@
     selection_color: (1,1,1,.4)
     write_tab: False
 
-<TileBackground>
+<Tile>
+
     canvas.before:
         Color:
             rgba: app.bg_color
@@ -191,14 +193,45 @@
 
 <ThreeBy>
 
-    cols: 3
-
 #    canvas.before:
 #        Color:
-#            rgba: app.bg_color
+#            rgba: .1, 1, 1, .2
 #        Rectangle:
-#            size: [s/3 for s in self.size]
-#            pos: [s+1/3*self.height for s in self.pos]
+#            size: self.size
+#            pos: self.pos
+
+<ColGuide>
+
+    canvas.before:
+        Color:
+            rgba: app.lh_color
+        Rectangle:
+            size: self.size
+            pos: self.pos
+
+    size_hint: .025, .9
+
+<RowGuide>
+
+    canvas.before:
+        Color:
+            rgba: app.lh_color
+        Rectangle:
+            size: self.size
+            pos: self.pos
+
+    size_hint: .9, .025
+
+<BoxGuide>
+
+    canvas.before:
+        Color:
+            rgba: app.lh_color
+        Rectangle:
+            size: self.size
+            pos: self.pos
+
+    size_hint: .3225, .3225
 
 
 <NineBy>

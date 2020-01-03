@@ -1,8 +1,8 @@
 class Puzzle:
     grid = []
 
-    for col in range(1, 10):
-        for row in range(1, 10):
+    for col in range(9):
+        for row in range(9):
             grid.append((col, row))
 
     def __init__(self, definition, rating):
@@ -22,7 +22,7 @@ class Puzzle:
         return self.values[item]
 
 
-class Tile:
+class PuzzleTile:
 
     def __init__(self, position, value=None, locked=False):
         self.position = position
@@ -34,13 +34,13 @@ class Tile:
 class Board:
     """Container for logical representation of sudoku grid"""
 
-    vert = {'top': (1, 2, 3),
-            'mid': (4, 5, 6),
-            'bot': (7, 8, 9),
+    vert = {'top': (1, 2, 0),
+            'mid': (4, 5, 3),
+            'bot': (7, 8, 6),
             }
-    horiz = {'left': (1, 2, 3),
-             'center': (4, 5, 6),
-             'right': (7, 8, 9),
+    horiz = {'left': (1, 2, 0),
+             'center': (4, 5, 3),
+             'right': (7, 8, 6),
              }
 
     sections = {}
@@ -57,9 +57,9 @@ class Board:
 
     def __init__(self, puzzle=None):
         self.tiles = {}
-        for col in range(1, 10):
-            for row in range(1, 10):
-                self.tiles[(col, row)] = Tile((col, row))
+        for col in range(9):
+            for row in range(9):
+                self.tiles[(col, row)] = PuzzleTile((col, row))
 
         if puzzle:
             for k, v in puzzle.items():
@@ -71,6 +71,9 @@ class Board:
             puzzle = self._generate_puzzle()
 
         self.puzzle = puzzle
+
+    def __getitem__(self, item):
+        return self.tiles[item].value
 
     def __str__(self):
         base = [None for _ in range(9)]
@@ -88,7 +91,7 @@ class Board:
 
     def _solve_iteration(self, tiles):
         tile = tiles.pop()
-        for i in range(1, 10):
+        for i in range(9):
             tile.value = i
             if self.validate(tile):
                 try:
@@ -114,41 +117,64 @@ class Board:
     def build(self):
         ...
 
-    def validate(self, tile):
-        return False not in (self._check_col(tile), self._check_row(tile), self._check_box(tile))
+    def validate(self, tile) -> set:
+        conflicts = set()
+        for result in (self._check_col(tile), self._check_row(tile), self._check_box(tile)):
+            conflicts = conflicts | result
+        return conflicts
 
     def _generate_puzzle(self):
         self.reset()
         return ...
 
     def _check_col(self, tile):
+        if tile.value is None:
+            return set()
         col, row = tile.position
-        others = [self.tiles[(_col, row)] for _col in range(1, 10) if _col != col]
-        return tile.value not in [other.value for other in others]
+        others = [self.tiles[(_col, row)] for _col in range(9) if _col != col]
+        matches = set()
+        for other in others:
+            if tile.value == other.value:
+                matches.add(tile.position)
+                matches.add(other.position)
+        return matches
 
     def _check_row(self, tile):
+        if tile.value is None:
+            return set()
         col, row = tile.position
-        others = [self.tiles[(col, _row)] for _row in range(1, 10) if _row != row]
-        return tile.value not in [other.value for other in others]
+        others = [self.tiles[(col, _row)] for _row in range(9) if _row != row]
+        matches = set()
+        for other in others:
+            if tile.value == other.value:
+                matches.add(tile.position)
+                matches.add(other.position)
+        return matches
 
+    # noinspection PyUnboundLocalVariable
     def _check_box(self, tile):
+        if tile.value is None:
+            return set()
         pos = tile.position
         for positions in self.sections.values():
             if pos in positions:
                 others = [self.tiles[_pos] for _pos in positions if _pos != pos]
-
-        # noinspection PyUnboundLocalVariable
-        return tile.value not in [other.value for other in others]
+        matches = set()
+        for other in others:
+            if tile.value == other.value:
+                matches.add(tile.position)
+                matches.add(other.position)
+        return matches
 
 
 with open('expert.csv') as f:
     for line in f:
         _puzzle, _ = line.split(',', maxsplit=1)
 
-tuples =[]
-for i in range(1,10):
-    for j in range(1,10):
-        tuples.append((i,j))
+tuples = []
+for i in range(9):
+    for j in range(9):
+        tuples.append((i, j))
 
 chars = []
 for ch in _puzzle:
@@ -171,5 +197,5 @@ puzzle = {k: v for k, v in zip(tuples, chars)}
 
 b = Board(puzzle=puzzle)
 print(b, end='\n\n')
-b.solve()
-print(b)
+# b.solve()
+# print(b)
