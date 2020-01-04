@@ -40,15 +40,16 @@ class Database:
     def puzzle_by_uid(self, uid):
         return self.all_puzzles[uid]
 
-    def random_puzzle(self, difficulty='all'):
-        if difficulty in ['easy', 'beginner']:
-            choices = self._random_puzzle('easy')
-        elif difficulty in ['medium', 'intermediate']:
-            choices = self._random_puzzle('intermediate')
-        elif difficulty in ['hard', 'expert']:
-            choices = self._random_puzzle('expert')
-        else:
-            choices = list(self.all_puzzles.values())
+    def random_puzzle(self, difficulty=None):
+        if not difficulty:
+            return random.choice(list(self.all_puzzles.values()))
+
+        if difficulty.lower() in ['easy', 'beginner']:
+            choices = self._random_puzzle('Easy')
+        elif difficulty.lower() in ['medium', 'intermediate']:
+            choices = self._random_puzzle('Intermediate')
+        elif difficulty.lower() in ['hard', 'expert']:
+            choices = self._random_puzzle('Expert')
 
         return random.choice(choices)
 

@@ -23,7 +23,6 @@ from database import Database
 from __init__ import *
 import re
 import threading
-import time
 
 DARK_HIGHLIGHT = (0.1568627450980392, 0.16862745098039217, 0.18823529411764706, 1)  # Darkest Gray
 BACKGROUND_COLOR = (0.18823529411764706, 0.19215686274509805, 0.21176470588235294, 1)  # Dark gray
@@ -62,6 +61,9 @@ class TaskButton(ButtonBehavior, Image):
         self.buttons['Reset'] = app.reset
         self.buttons['Open Puzzle'] = app.root.puzzle_picker
         self.buttons['Random'] = PuzzlePicker.random
+        self.buttons['Easy'] = PuzzlePicker.easy
+        self.buttons['Intermediate'] = PuzzlePicker.med
+        self.buttons['Expert'] = PuzzlePicker.hard
 
     def task_button_callback(self, button_text):
         try:
@@ -78,10 +80,6 @@ class TaskButtonLayout(FloatLayout):
 
     button_text = StringProperty()
     image_path = StringProperty()
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.fac = None
 
 
 class ToggleLayout(FloatLayout):
@@ -575,15 +573,35 @@ class Main(FloatLayout):
         PuzzlePicker.current.open()
 
 
+class PuzzleRandomLayout(FloatLayout):
+    """Layout for random choice options"""
+
+
 class PuzzlePicker(Popup):
     """Popup for choosing puzzles"""
 
     current = None
 
     @staticmethod
-    def random(difficulty='all'):
+    def random():
+        return PuzzlePicker.current._random()
+
+    @staticmethod
+    def easy():
+        return PuzzlePicker.current._random(difficulty='easy')
+
+    @staticmethod
+    def med():
+        return PuzzlePicker.current._random(difficulty='medium')
+
+    @staticmethod
+    def hard():
+        return PuzzlePicker.current._random(difficulty='hard')
+
+    @staticmethod
+    def _random(difficulty=None):
         app = App.get_running_app()
-        puzzle = app.db.random_puzzle()
+        puzzle = app.db.random_puzzle(difficulty)
         app.board = Board(puzzle=puzzle)
         NineBy.instance.children.clear()
         NineBy.instance.construct()
@@ -629,9 +647,7 @@ class SudokuSolverApp(App):
         self.inspections = False
         self.solve_iter_count = 0
         self.db = Database()
-        choice = self.db.random_puzzle()
-        print(choice)
-        self.board = Board(choice)
+        self.board = Board(puzzle=self.db.blank_puzzle)
 
     def build(self):
         return Main()

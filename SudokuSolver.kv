@@ -263,28 +263,54 @@
     title: ''
     title_size: 0
 
-    GridLayout:
-        cols: 2
+    FloatLayout:
+#        cols: 2
         size_hint: None, None
+        pos_hint: {'x': 0, 'y': .005}
         size: 600-27, 400-25
+
 
         TaskButtonLayout:
             button_text: 'Random'
             image_path: 'src/64random.png'
 #            height: 400
+            size_hint: .5, .6
+            pos_hint: {'x': 0, 'y': .4}
 
         TaskButtonLayout:
             button_text: 'Enter ID'
             image_path: 'src/64search.png'
 #            height: 400
+            size_hint: .5, .6
+            pos_hint: {'x': 0.5, 'y': .4}
 
-        Label:
-            size_hint: None, None
-            height: 200
+        PuzzleRandomLayout:
+            size_hint: (1, 1)
+            pos_hint: {'x': 0, 'y': 0}
 
-        Label:
-            size_hint: None, None
-            height: 200
+<PuzzleRandomLayout>
+
+
+
+    TaskButtonLayout:
+        button_text: 'Easy'
+        image_path: 'src/64star.png'
+        size_hint: 1/3, .4
+        pos_hint: {'x': 0, 'y': 0}
+
+    TaskButtonLayout:
+        button_text: 'Intermediate'
+        image_path: 'src/128med.png'
+        size_hint: 1/3, .4
+        pos_hint: {'x': 1/3, 'y': 0}
+
+    TaskButtonLayout:
+        button_text: 'Expert'
+        image_path: 'src/128expert.png'
+        size_hint: 1/3, .4
+        pos_hint: {'x': 2/3, 'y': 0}
+
+
 
 <Main>:
     canvas:

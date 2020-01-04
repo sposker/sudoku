@@ -126,36 +126,22 @@ class Board:
                 none_values.append(tile)
         return none_values
 
-    def build(self):
+    def build(self):  # TODO
         ...
 
     def validate(self, tile) -> set:
-        conflicts = set()
-        for result in (self._check_col(tile), self._check_row(tile), self._check_box(tile)):
-            conflicts = conflicts | result
-        return conflicts
+        return self._check_linear(tile) | self._check_box(tile)
 
     def _generate_puzzle(self):
         self.reset()
         return ...
 
-    def _check_col(self, tile):
+    def _check_linear(self, tile):
         if tile.value is None:
             return set()
         col, row = tile.position
-        others = [self.tiles[(_col, row)] for _col in range(9) if _col != col]
-        matches = set()
-        for other in others:
-            if tile.value == other.value:
-                matches.add(tile.position)
-                matches.add(other.position)
-        return matches
-
-    def _check_row(self, tile):
-        if tile.value is None:
-            return set()
-        col, row = tile.position
-        others = [self.tiles[(col, _row)] for _row in range(9) if _row != row]
+        others = [self.tiles[(_col, row)] for _col in range(9) if _col != col] + \
+                 [self.tiles[(col, _row)] for _row in range(9) if _row != row]
         matches = set()
         for other in others:
             if tile.value == other.value:
