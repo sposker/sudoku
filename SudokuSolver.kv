@@ -161,9 +161,9 @@
 
 
 <TileGuesses>
+    rows: 3
     background_color: app.trans
     background_normal: ''
-#    foreground_color: app.text_color if not self.locked else app.lh_color
     cursor_color: app.text_color
 
 
@@ -243,6 +243,48 @@
             size: self.size
             pos: self.pos
 
+<PuzzlePicker>
+
+    canvas.before:
+        Color:
+            rgba: 0, 0, 0, .75
+        Rectangle:
+            size: self._window.size if self._window else (0, 0)
+        Color:
+            rgba: 0,0,0,.1
+        Rectangle:
+            size: self.size
+            pos: self.pos
+
+    background_color: app.trans
+    separator_color: app.trans
+    size_hint: (None, None)
+    size: (600, 400)
+    title: ''
+    title_size: 0
+
+    GridLayout:
+        cols: 2
+        size_hint: None, None
+        size: 600-27, 400-25
+
+        TaskButtonLayout:
+            button_text: 'Random'
+            image_path: 'src/64random.png'
+#            height: 400
+
+        TaskButtonLayout:
+            button_text: 'Enter ID'
+            image_path: 'src/64search.png'
+#            height: 400
+
+        Label:
+            size_hint: None, None
+            height: 200
+
+        Label:
+            size_hint: None, None
+            height: 200
 
 <Main>:
     canvas:

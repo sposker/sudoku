@@ -1,28 +1,40 @@
 class Puzzle:
+
     grid = []
+    count = 0
 
     for col in range(9):
         for row in range(9):
             grid.append((col, row))
 
-    def __init__(self, definition, rating):
-
-        self.rating = rating
+    def __init__(self, **kwargs):
+        self.uid = Puzzle.count
+        self.__dict__.update(**kwargs)
         self.values = {}
-        for k, v in enumerate(definition):
-            location = self.grid[k]
+        puzzle = kwargs['puzzle']
+
+        for k, v in zip(self.grid, list(puzzle)):
             try:
-                value = int(v)
-            except TypeError:
-                value = None
-            if value:
-                self.values[location] = value
+                self.values[k] = int(v)
+            except ValueError:
+                self.values[k] = None
+
+        Puzzle.count += 1
+
+    def __repr__(self):
+        return ', '.join([f'{k}={v}' for k, v in self.__dict__.items() if k != 'values'])
 
     def __getitem__(self, item):
         return self.values[item]
 
+    def __hash__(self):
+        return hash(self.__repr__())
 
-class PuzzleTile:
+    def items(self):
+        yield from ((k, v) for k, v in self.values.items())
+
+
+class BoardTile:
 
     def __init__(self, position, value=None, locked=False):
         self.position = position
@@ -59,7 +71,7 @@ class Board:
         self.tiles = {}
         for col in range(9):
             for row in range(9):
-                self.tiles[(col, row)] = PuzzleTile((col, row))
+                self.tiles[(col, row)] = BoardTile((col, row))
 
         if puzzle:
             for k, v in puzzle.items():
@@ -166,24 +178,19 @@ class Board:
                 matches.add(other.position)
         return matches
 
-
-with open('expert.csv') as f:
-    for line in f:
-        _puzzle, _ = line.split(',', maxsplit=1)
-
-tuples = []
-for i in range(9):
-    for j in range(9):
-        tuples.append((i, j))
-
-chars = []
-for ch in _puzzle:
-    if ch != '.':
-        chars.append(int(ch))
-    else:
-        chars.append(None)
-
-puzzle = {k: v for k, v in zip(tuples, chars)}
+# tuples = []
+# for i in range(9):
+#     for j in range(9):
+#         tuples.append((i, j))
+#
+# chars = []
+# for ch in _puzzle:
+#     if ch != '.':
+#         chars.append(int(ch))
+#     else:
+#         chars.append(None)
+#
+# _puzzle = {k: v for k, v in zip(tuples, chars)}
 
 # puzzle = {(1, 5): 6,
 #           (6, 1): 6,
@@ -195,7 +202,7 @@ puzzle = {k: v for k, v in zip(tuples, chars)}
 #           (9, 4): 8,
 #           (9, 1): 2}
 
-b = Board(puzzle=puzzle)
-print(b, end='\n\n')
+# b = Board(puzzle=_puzzle)
+# print(b, end='\n\n')
 # b.solve()
 # print(b)

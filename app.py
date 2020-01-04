@@ -1,9 +1,7 @@
 from kivy.app import App
 from kivy.clock import Clock, mainthread
 from kivy.core.window import Window
-from kivy.core.text.markup import MarkupLabel
 from kivy.factory import Factory
-from kivy.uix.anchorlayout import AnchorLayout
 from kivy.uix.behaviors import ButtonBehavior, ToggleButtonBehavior
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
@@ -20,7 +18,8 @@ from kivy.uix.spinner import Spinner
 from kivy.uix.textinput import TextInput
 from kivy.uix.togglebutton import ToggleButton
 
-import classes
+from classes import Board
+from database import Database
 from __init__ import *
 import re
 import threading
@@ -54,19 +53,24 @@ class TaskButton(ButtonBehavior, Image):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        Clock.schedule_once(self._register_callbacks)
+        Clock.schedule_once(self._register_callbacks)  # ensure app is running before trying to resolve references
 
     def _register_callbacks(self, _):
+        """Assign callbacks to buttons *after* app has been built"""
         app = App.get_running_app()
         self.buttons['Solve'] = app.root.start_second_thread
         self.buttons['Reset'] = app.reset
+        self.buttons['Open Puzzle'] = app.root.puzzle_picker
+        self.buttons['Random'] = PuzzlePicker.random
 
     def task_button_callback(self, button_text):
         try:
             callback = self.buttons[button_text]
             callback.__call__()
-        except TypeError:
-            print(button_text)
+        except AttributeError:
+            print(f'No callback present for <{button_text}>.')
+        except KeyError:
+            print(f'No key present for <{button_text}>.')
 
 
 class TaskButtonLayout(FloatLayout):
@@ -74,6 +78,10 @@ class TaskButtonLayout(FloatLayout):
 
     button_text = StringProperty()
     image_path = StringProperty()
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.fac = None
 
 
 class ToggleLayout(FloatLayout):
@@ -217,7 +225,6 @@ class Tile(FloatLayout):
         _next = Tile.tiles[(next_x, next_y)]
 
         while _next.locked:
-            print(next_x, next_y)
             next_x, next_y = calculate_next_focus(next_x, next_y)
             _next = Tile.tiles[(next_x, next_y)]
 
@@ -248,6 +255,16 @@ class Tile(FloatLayout):
 
 class TileGuesses(GridLayout):
     """Holds guesses"""
+
+    def __init__(self, **kwargs):
+        self.labels = {}
+        super().__init__(**kwargs)
+        for i in [7, 8, 9, 4, 5, 6, 1, 2, 3]:
+            _label = Label(text=str(i),
+                           color=TEXT_COLOR,
+                           opacity=0)
+            self.add_widget(_label)
+            self.labels[i] = _label
 
 
 class TileInput(TextInput):
@@ -283,6 +300,13 @@ class TileInput(TextInput):
             widget = self.parent.directional_focus[key]
             self.focus = False
             widget.input.focus = True
+
+        elif 'shift' in modifiers and (keycode[0] in range(49, 58) or keycode[0] in range(257, 266)):
+            value = keycode[1][-1]  # last digit of string
+            guesses = self.parent.guesses
+            label = guesses.labels[int(value)]
+            _, r = divmod(label.opacity + 1, 2)
+            label.opacity = r
 
         elif keycode in self.codes.keys():
             key = self.codes[keycode]
@@ -324,6 +348,9 @@ class TileInput(TextInput):
 
     def set_text(self, text):
         setattr(self.parent.label, 'text', text)
+        if text:
+            for label in self.parent.guesses.labels.values():
+                label.opacity = 0
         conflicts = self.app.update_board(self.parent.grid_position, self.text)
         if conflicts:
             Tile.conflicts = conflicts
@@ -417,6 +444,10 @@ class NineBy(FloatLayout):
         self.cols = {}
         self.rows = {}
         self.boxes = {}
+
+        self.construct()
+
+    def construct(self):
         self.add_col_guides()
         self.add_row_guides()
         self.add_box_guides()
@@ -538,6 +569,26 @@ class Main(FloatLayout):
             tile = Tile.tiles[pos]
             tile.label.text = str(_tile.value) if _tile.value else ''
 
+    @staticmethod
+    def puzzle_picker():
+        PuzzlePicker.current = Factory.PuzzlePicker()
+        PuzzlePicker.current.open()
+
+
+class PuzzlePicker(Popup):
+    """Popup for choosing puzzles"""
+
+    current = None
+
+    @staticmethod
+    def random(difficulty='all'):
+        app = App.get_running_app()
+        puzzle = app.db.random_puzzle()
+        app.board = Board(puzzle=puzzle)
+        NineBy.instance.children.clear()
+        NineBy.instance.construct()
+        PuzzlePicker.current.dismiss()
+
 
 class SudokuSolverApp(App):
     # Config Properties
@@ -576,9 +627,13 @@ class SudokuSolverApp(App):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.inspections = False
+        self.solve_iter_count = 0
+        self.db = Database()
+        choice = self.db.random_puzzle()
+        print(choice)
+        self.board = Board(choice)
 
     def build(self):
-        self.board = classes.b
         return Main()
 
     def _set_board_value(self, pos, value):
@@ -615,10 +670,11 @@ class SudokuSolverApp(App):
     def slow_solve(self):
 
         tiles = self.board.reset()
+        self.solve_iter_count = 0
         self._slow_solve(tiles)
+        print(self.solve_iter_count)
 
     def _slow_solve(self, tiles):
-        import time
 
         tile = tiles.pop()
         label = Tile.tiles[tile.position].label
@@ -626,9 +682,10 @@ class SudokuSolverApp(App):
 
         for i in range(1, 10):
             self.root.update_values()
+            self.solve_iter_count += 1
+            print(i)
             # time.sleep(.0001)
             tile.value = i
-            print(i)
 
             if not self.board.validate(tile):
                 label.color = self.text_color
@@ -654,8 +711,16 @@ class SudokuSolverApp(App):
             Tile.tiles[pos].label.color = self.text_color
             Tile.tiles[pos].input.text = ''
 
-    def set_board(self, board: classes.Board):
-        ...
+    # def set_board(self, difficulty=None, uid=None):
+    #     if uid:
+    #         puzzle = self.db.all_puzzles[uid]
+    #     elif difficulty:
+    #         puzzle = self.db.random_puzzle()
+    #     else:
+    #         puzzle = self.db.blank_puzzle
+    #
+    #     self.board = Board(puzzle)
+    #     self.reset()
 
     def on_stop(self):
         # The Kivy event loop is about to stop, set a stop signal;
@@ -663,5 +728,7 @@ class SudokuSolverApp(App):
         # keep running until all secondary threads exit.
         self.root.stop.set()
 
+
 if __name__ == '__main__':
+    # Factory.register('PuzzlePicker', cls=PuzzlePicker)
     SudokuSolverApp().run()

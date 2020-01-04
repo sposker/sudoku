@@ -1,6 +1,6 @@
 from kivy.graphics.context_instructions import Color
 from kivy.graphics.instructions import CanvasBase
-from kivy.graphics.vertex_instructions import RoundedRectangle, Rectangle
+from kivy.graphics.vertex_instructions import Rectangle
 
 
 def as_string(tup):
@@ -23,32 +23,32 @@ def as_list(tup):
     return [r, g, b, a]
 
 
-# noinspection PyUnboundLocalVariable
-def redraw_canvas(widget, color, corners=False):
-    try:
-        _color = widget.color
-    except AttributeError:
-        _color_fg = widget.foreground_color
-    dh0, dh1, dh2, _ = color
-    if corners:
-        radii = [widget.width / 2, widget.width / 2, 0, 0]
-    else:
-        radii = [widget.width / 2, widget.width / 2, widget.width / 2, widget.width / 2]
-    with widget.canvas.before:
-        CanvasBase.clear(widget.canvas.before)
-        Color(dh0, dh1, dh2)
-        widget.rect = Rectangle(size=widget.size,
-                                pos=widget.pos,
-                                radius=radii)
-        try:
-            Color(_color[0:2])
-        except UnboundLocalError:
-            Color(_color_fg[0:2])
-    widget.canvas.ask_update()
-    try:
-        widget.color = _color
-    except UnboundLocalError:
-        widget.foreground_color = _color_fg
+# # noinspection PyUnboundLocalVariable
+# def redraw_canvas(widget, color, corners=False):
+#     try:
+#         _color = widget.color
+#     except AttributeError:
+#         _color_fg = widget.foreground_color
+#     dh0, dh1, dh2, _ = color
+#     if corners:
+#         radii = [widget.width / 2, widget.width / 2, 0, 0]
+#     else:
+#         radii = [widget.width / 2, widget.width / 2, widget.width / 2, widget.width / 2]
+#     with widget.canvas.before:
+#         CanvasBase.clear(widget.canvas.before)
+#         Color(dh0, dh1, dh2)
+#         widget.rect = Rectangle(size=widget.size,
+#                                 pos=widget.pos,
+#                                 radius=radii)
+#         try:
+#             Color(_color[0:2])
+#         except UnboundLocalError:
+#             Color(_color_fg[0:2])
+#     widget.canvas.ask_update()
+#     try:
+#         widget.color = _color
+#     except UnboundLocalError:
+#         widget.foreground_color = _color_fg
 
 
 def hide_widget(wid, dohide=True):
