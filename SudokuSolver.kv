@@ -123,9 +123,6 @@
         source:
             'src/Sudoku150.png'
 
-
-
-
     Label:
         color: 0,0,0,1
         text: "Solving Sudokus\n  (with snakes)"
@@ -160,6 +157,15 @@
     multiline: False
 
 
+<TileBackground>
+    canvas.before:
+        Color:
+            rgba: app.bg_color
+        Rectangle:
+            size: [s-4 for s in self.size]
+            pos: 2, 2
+
+
 <TileGuesses>
     rows: 3
     background_color: app.trans
@@ -185,10 +191,18 @@
 
     canvas.before:
         Color:
-            rgba: app.bg_color
+            rgba: app.trans
         Rectangle:
-            size: [s-4 for s in self.size]
-#            pos: [s+2 for s in self.pos]
+            size: [s+2 for s in self.size]
+
+
+#    Label:
+#        canvas.before:
+#        Color:
+#            rgba: app.bg_color
+#        Rectangle:
+#            size: [s-4 for s in self.size]
+
 
 
 <ThreeBy>
@@ -219,9 +233,9 @@
             rgba: app.lh_color
         Rectangle:
             size: self.size
-#            pos: [-x for x in self.pos]
+            pos: self.pos
 
-#    size_hint: 1, 1/9
+#    pos_hint: {'center_x': 0, 'center_y': 0.5}
 
 <BoxGuide>
 
@@ -230,7 +244,7 @@
             rgba: app.lh_color
         Rectangle:
             size: self.size
-#            pos: self.pos
+            pos: self.pos
 
     opacity: 0
 
@@ -331,4 +345,4 @@
     Panel:
         size_hint: None, None
         size: Nine.width / 1.618, Nine.height
-        pos: (Nine.width + Nine.x + 20, Nine.y)
+        pos: (Nine.width + 2*Nine.x, Nine.y)
