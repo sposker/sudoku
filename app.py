@@ -35,7 +35,9 @@ ITEM_ROW_HEIGHT = 72
 TEXT_BASE_SIZE = 40
 
 Window.size = (round(1440 * 1.618) / 2, 1440 / 2)
-Window.borderless = True
+
+
+# Window.borderless = True
 
 
 class TaskButton(ButtonBehavior, Image):
@@ -137,7 +139,7 @@ class Panel(FloatLayout):
     """Holds buttons on sidebar"""
 
 
-class Tile(FloatLayout):
+class Tile(RelativeLayout):
     """Tile holding various widgets for sudoku tile functionality"""
 
     tiles = {}
@@ -152,21 +154,22 @@ class Tile(FloatLayout):
         self.directional_focus = {}
         Tile.tiles[self.grid_position] = self
 
-        _h, _v = [(v - .005) * 3 for v in self.pos_hint.values()]
+        # _h, _v = [(v - .005) * 3 for v in self.pos_hint.values()]
 
         self.input = TileInput(size_hint=(.95, .95),
-                               pos_hint={'x': (2.5 * _h - _h * _h) * .005 + .025, 'y': _v * 0.005 - .125},
+                               # pos_hint={'x': (2.5 * _h - _h * _h) * .005 + .025, 'y': _v * 0.005 - .125},
+                               pos_hint={'y': -0.125}
                                )
         self.input.bind(focus=lambda x, y: self.input.on_focus)
         self.add_widget(self.input)
 
         self.label = TileLabel(size_hint=(.95, .95),
-                               pos_hint={'x': 0.025, 'y': 0},
+                               # pos_hint={'x': 0.025, 'y': 0},
                                )
         self.add_widget(self.label)
 
         self.guesses = TileGuesses(size_hint=(.95, .95),
-                                   pos_hint={'x': 0.025, 'y': 0.025},
+                                   # pos_hint={'x': 0.025, 'y': 0.025},
                                    )
         self.add_widget(self.guesses)
 
@@ -375,27 +378,43 @@ class TileLabel(Label):
     """Label displaying tiles' value"""
 
 
-class RowGuide(Label):
-    def __init__(self, num, **kwargs):
-        super().__init__(**kwargs)
-        self.row_pos = num
-
-
-class ColGuide(Label):
-
-    def __init__(self, num, **kwargs):
-        super().__init__(**kwargs)
-        self.col_pos = num
-
-
 class BoxGuide(Label):
+    items = {}
 
     def __init__(self, num, **kwargs):
         super().__init__(**kwargs)
         self.grid_pos = num
 
 
-class ThreeBy(FloatLayout):
+class LinearGuide(Label):
+
+    def __init__(self, _, **kwargs):
+        super().__init__(**kwargs)
+
+    @classmethod
+    def create_guide(cls, coord):
+        new = cls(coord)
+        cls.items[coord] = new
+        return new
+
+
+class ColGuide(LinearGuide):
+    items = {}
+
+    def __init__(self, num, **kwargs):
+        super().__init__(None, **kwargs)
+        self.col_pos = num
+
+
+class RowGuide(LinearGuide):
+    items = {}
+
+    def __init__(self, num, **kwargs):
+        super().__init__(None, **kwargs)
+        self.row_pos = num
+
+
+class ThreeBy(RelativeLayout):
     """3x3 grid of tiles"""
 
     def __init__(self, grid_pos, **kwargs):
@@ -404,14 +423,33 @@ class ThreeBy(FloatLayout):
         super().__init__(**kwargs)
 
     def make_tiles(self, **_):
-        for vert in range(3):
-            for horiz in range(3):
-                coords = (self._h_offset + horiz, self._v_offset + vert)
-                _h, _v = [i * 1 / 3 + .005 for i in [horiz, vert]]
+        for vert in [0, 1 / 3, 2 / 3]:
+            for horiz in [0, 1 / 3, 2 / 3]:
+                coords = (self._h_offset + 3 * horiz, self._v_offset + 3 * vert)
+                # _h, _v = [i * 1 / 3 + .005 for i in [horiz, vert]]
                 _w = Tile(coords,
-                          size_hint=(.321, .321),
-                          pos_hint={'x': _h, 'y': _v})
+                          size_hint=(.33, .33),
+                          pos_hint={'x': horiz, 'y': vert},
+                          )
+
+                if coords[0] == 0:  # make row and col guides along the edge
+                    for cls, size in [(RowGuide, (9, 1)), (ColGuide, (1, 9))]:
+                        guide = cls.create_guide(coords[0])
+                        # guide.pos = [-(4-coords[0]) for _ in range(2)]
+                        _w.add_widget(guide)
+                        guide.size_hint = size
+                        guide.pos_hint = {'x': coords[0], 'y': .5}  # {k: 2*(4-coords[0]) for k in ['x', 'y']}
+                    guide.opacity = 0
+
                 self.add_widget(_w)
+
+    def add_linear_guides(self, widget_class, coordinate):
+
+        widget = widget_class(coordinate)
+        widget.opacity = 0
+
+        widget_class.items[coordinate] = widget
+        self.add_widget(widget)
 
     def populate_tiles(self):
         app = App.get_running_app()
@@ -446,9 +484,10 @@ class NineBy(FloatLayout):
         self.construct()
 
     def construct(self):
-        self.add_col_guides()
-        self.add_row_guides()
-        self.add_box_guides()
+        # self.add_col_guides()
+        # self.add_row_guides()
+        # self.add_linear_guides()
+        # self.add_box_guides()
 
         self.fill()
         for widget in self.children:
@@ -456,52 +495,83 @@ class NineBy(FloatLayout):
                 widget.populate_tiles()
             except AttributeError:
                 pass
-        self.set_focus_behavior()
+        # self.set_focus_behavior()
 
     def fill(self):
         for vert in range(3):
             for horiz in range(3):
+                n = horiz
+                m = vert
+                hint_size = .321
+                offset = (1 / 3 - hint_size) * 2 / 3
+                # g = BoxGuide((horiz, vert))
+                # self.add_widget(g)
+                # g.pos_hint = {'x': horiz / 3 + offset / 2, 'y': vert / 3 + offset / 2}
+                # g.size_hint = [hint_size + offset for _ in range(2)]
+                # for _x in [3 * n, 3 * n + 1, 3 * n + 2]:
+                #     for _y in [3 * m, 3 * m + 1, 3 * m + 2]:
+                #         self.boxes[(_x, _y)] = g
+
                 w = ThreeBy((horiz, vert))
                 self.add_widget(w)
                 w.make_tiles()
-                w.size_hint = (.321, .321)
-                _h, _v = [i * 1 / 3 + .005 for i in [horiz, vert]]
-                w.pos_hint = {'x': _h, 'y': _v}
+                w.size_hint = [hint_size for _ in range(2)]
+                w.pos_hint = {'x': horiz / 3 + offset, 'y': vert / 3 + offset}
 
     def set_focus_behavior(self):
         for grid in self.children:
             for tile in grid.children:
                 tile.set_focus_behavior()
 
-    def add_col_guides(self):
-        for n in range(3):
-            for m in range(3):
-                guide = ColGuide(n)
-                guide.pos_hint = {'x': (3 * m + .975 * n + .35) * 1 / 9, 'y': .05}
-                self.add_widget(guide)
-                guide.opacity = 0
-                self.cols[3 * m + n] = guide
+    def add_linear_guides(self):
+        hint_size = .321
+        offset = (1 / 3 - hint_size) * 2 / 3
+        for v in range(3):
+            for h in range(3):
+                row = RowGuide(3 * v + h)
+                row.pos_hint = {'x': 0, 'y': ((3 * v + h) / 9) - (offset * (h - 1) / 3)}
+                row.opacity = 0
+                row.size_hint = (1, hint_size / 3 + offset / 2)
+                self.rows[3 * v + h] = row
+                self.add_widget(row)
 
-    def add_row_guides(self):
-        for n in range(3):
-            for m in range(3):
-                guide = RowGuide(n)
-                guide.pos_hint = {'y': (3 * m + .975 * n + .35) * 1 / 9, 'x': .05}
-                self.add_widget(guide)
-                guide.opacity = 0
-                self.rows[3 * m + n] = guide
+                col = ColGuide(3 * v + h)
+                col.pos_hint = {'x': ((3 * h + v) / 9) - (offset * (v - 1) / 3), 'y': 0}
+                col.opacity = 0
+                col.size_hint = (hint_size / 3 + offset / 2, 1)
+                self.cols[3 * h + v] = col
+                self.add_widget(col)
 
-    def add_box_guides(self):
-        for n in range(3):
-            for m in range(3):
-                guide = BoxGuide((n, m))
-                self.add_widget(guide)
-                _h, _v = [i * 1 / 3 + .005 for i in [n, m]]
-                guide.pos_hint = {'x': _h, 'y': _v}
-                guide.opacity = 0
-                for _x in [3 * n, 3 * n + 1, 3 * n + 2]:
-                    for _y in [3 * m, 3 * m + 1, 3 * m + 2]:
-                        self.boxes[(_x, _y)] = guide
+    #
+    # def add_col_guides(self):
+    #     for n in range(3):
+    #         for m in range(3):
+    #             guide = ColGuide(n)
+    #             guide.pos_hint = {'x': (3 * m + .975 * n + .35) * 1 / 9, 'y': .05}
+    #             self.add_widget(guide)
+    #             guide.opacity = 0
+    #             self.cols[3 * m + n] = guide
+    #
+    # def add_row_guides(self):
+    #     for n in range(3):
+    #         for m in range(3):
+    #             guide = RowGuide(n)
+    #             guide.pos_hint = {'y': (3 * m + .975 * n + .35) * 1 / 9, 'x': .05}
+    #             self.add_widget(guide)
+    #             guide.opacity = 0
+    #             self.rows[3 * m + n] = guide
+    #
+    # def add_box_guides(self):
+    #     for n in range(3):
+    #         for m in range(3):
+    #             guide = BoxGuide((n, m))
+    #             self.add_widget(guide)
+    #             _h, _v = [i * 1 / 3 + .005 for i in [n, m]]
+    #             guide.pos_hint = {'x': n, 'y': m}
+    #             guide.opacity = 0
+    #             for _x in [3 * n, 3 * n + 1, 3 * n + 2]:
+    #                 for _y in [3 * m, 3 * m + 1, 3 * m + 2]:
+    #                     self.boxes[(_x, _y)] = guide
 
     def trigger_guides(self, pos: (int, int)):
         if self.guides:
@@ -537,6 +607,149 @@ class NineBy(FloatLayout):
             box.opacity = 0
 
 
+# class ThreeBy(FloatLayout):
+#     """3x3 grid of tiles"""
+#
+#     def __init__(self, grid_pos, **kwargs):
+#         self.grid_pos = grid_pos
+#         self._h_offset, self._v_offset = 3 * grid_pos[0], 3 * grid_pos[1]
+#         super().__init__(**kwargs)
+#
+#     def make_tiles(self, **_):
+#         for vert in range(3):
+#             for horiz in range(3):
+#                 coords = (self._h_offset + horiz, self._v_offset + vert)
+#                 _h, _v = [i * 1 / 3 + .005 for i in [horiz, vert]]
+#                 _w = Tile(coords,
+#                           size_hint=(.321, .321),
+#                           pos_hint={'x': _h, 'y': _v},
+#                           )
+#                 self.add_widget(_w)
+#
+#     def populate_tiles(self):
+#         app = App.get_running_app()
+#         for tile in self.children:
+#             try:
+#                 value = app.board[tile.grid_position]
+#             except KeyError:
+#                 value = None
+#
+#             if value:
+#                 tile.label.text = str(value)
+#                 tile.label.underline = True
+#
+#                 tile.input.locked = True
+#                 tile.input.disabled = True
+#                 tile.locked = True
+#
+#
+# class NineBy(FloatLayout):
+#     """9x9 board containing 9 3x3 grids"""
+#
+#     instance = None
+#
+#     def __init__(self, **kw):
+#         super().__init__(**kw)
+#         NineBy.instance = self
+#         self.guides = False
+#         self.cols = {}
+#         self.rows = {}
+#         self.boxes = {}
+#
+#         self.construct()
+#
+#     def construct(self):
+#         self.add_col_guides()
+#         self.add_row_guides()
+#         self.add_box_guides()
+#
+#         self.fill()
+#         for widget in self.children:
+#             try:
+#                 widget.populate_tiles()
+#             except AttributeError:
+#                 pass
+#         self.set_focus_behavior()
+#
+#     def fill(self):
+#         for vert in range(3):
+#             for horiz in range(3):
+#                 w = ThreeBy((horiz, vert))
+#                 self.add_widget(w)
+#                 w.make_tiles()
+#                 w.size_hint = (.321, .321)
+#                 _h, _v = [i * 1 / 3 + .005 for i in [horiz, vert]]
+#                 w.pos_hint = {'x': _h, 'y': _v}
+#
+#     def set_focus_behavior(self):
+#         for grid in self.children:
+#             for tile in grid.children:
+#                 tile.set_focus_behavior()
+#
+#     def add_col_guides(self):
+#         for n in range(3):
+#             for m in range(3):
+#                 guide = ColGuide(n)
+#                 guide.pos_hint = {'x': (3 * m + .975 * n + .35) * 1 / 9, 'y': .05}
+#                 self.add_widget(guide)
+#                 guide.opacity = 0
+#                 self.cols[3 * m + n] = guide
+#
+#     def add_row_guides(self):
+#         for n in range(3):
+#             for m in range(3):
+#                 guide = RowGuide(n)
+#                 guide.pos_hint = {'y': (3 * m + .975 * n + .35) * 1 / 9, 'x': .05}
+#                 self.add_widget(guide)
+#                 guide.opacity = 0
+#                 self.rows[3 * m + n] = guide
+#
+#     def add_box_guides(self):
+#         for n in range(3):
+#             for m in range(3):
+#                 guide = BoxGuide((n, m))
+#                 self.add_widget(guide)
+#                 _h, _v = [i * 1 / 3 + .005 for i in [n, m]]
+#                 guide.pos_hint = {'x': _h, 'y': _v}
+#                 guide.opacity = 0
+#                 for _x in [3 * n, 3 * n + 1, 3 * n + 2]:
+#                     for _y in [3 * m, 3 * m + 1, 3 * m + 2]:
+#                         self.boxes[(_x, _y)] = guide
+#
+#     def trigger_guides(self, pos: (int, int)):
+#         if self.guides:
+#             self._trigger_guides(pos)
+#
+#     def _trigger_guides(self, pos):
+#         for row in self.rows.values():
+#             row.opacity = 0
+#         for col in self.cols.values():
+#             col.opacity = 0
+#         for box in self.boxes.values():
+#             box.opacity = 0
+#
+#         row = self.rows[pos[1]]
+#         col = self.cols[pos[0]]
+#         box = self.boxes[pos]
+#
+#         row.opacity = 1
+#         col.opacity = 1
+#         box.opacity = 1
+#
+#     def guides_on(self):
+#         self.guides = True
+#
+#     def guides_off(self):
+#         self.guides = False
+#
+#         for row in self.rows.values():
+#             row.opacity = 0
+#         for col in self.cols.values():
+#             col.opacity = 0
+#         for box in self.boxes.values():
+#             box.opacity = 0
+#
+#
 class Main(FloatLayout):
     """Main screen"""
 

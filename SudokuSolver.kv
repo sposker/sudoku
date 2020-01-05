@@ -188,7 +188,7 @@
             rgba: app.bg_color
         Rectangle:
             size: [s-4 for s in self.size]
-            pos: [s+2 for s in self.pos]
+#            pos: [s+2 for s in self.pos]
 
 
 <ThreeBy>
@@ -200,6 +200,7 @@
 #            size: self.size
 #            pos: self.pos
 
+
 <ColGuide>
 
     canvas.before:
@@ -209,7 +210,7 @@
             size: self.size
             pos: self.pos
 
-    size_hint: .025, .9
+#    size_hint: 1/9, 1
 
 <RowGuide>
 
@@ -218,9 +219,9 @@
             rgba: app.lh_color
         Rectangle:
             size: self.size
-            pos: self.pos
+#            pos: [-x for x in self.pos]
 
-    size_hint: .9, .025
+#    size_hint: 1, 1/9
 
 <BoxGuide>
 
@@ -229,9 +230,9 @@
             rgba: app.lh_color
         Rectangle:
             size: self.size
-            pos: self.pos
+#            pos: self.pos
 
-    size_hint: .3225, .3225
+    opacity: 0
 
 
 <NineBy>
