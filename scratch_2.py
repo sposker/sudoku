@@ -45,5 +45,22 @@ def main():
 #           f'Slowest solve time: {max(results)}; Fastest solve time: {min(results)}.')
 
 
-if __name__ == '__main__':
-    main()
+traceback = 'example\ntraceback\nstring'
+lines = traceback.split('\n')
+lines.reverse()
+
+parts = []
+n = 0
+
+while lines:
+    while n < 2000 and lines:
+        line = lines.pop()
+        parts.append(line)
+        n += len(line)
+    message = '\n'.join(parts[:-1])
+    if n < 2000:  # End of message
+        message += '\n' + parts[-1]
+    print(message)
+
+    parts = parts[-1]
+    n = len(parts[0])
