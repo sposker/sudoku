@@ -146,6 +146,9 @@
 
     TaskButtonGrid:
 
+<Tile>
+
+
 
 <TileLabel>
 
@@ -162,8 +165,8 @@
         Color:
             rgba: app.bg_color
         Rectangle:
-            size: [s-4 for s in self.size]
-            pos: 2, 2
+            size: self.size
+
 
 
 <TileGuesses>
@@ -171,8 +174,6 @@
     background_color: app.trans
     background_normal: ''
     cursor_color: app.text_color
-
-
 
 <TileInput>
 
@@ -187,35 +188,7 @@
     selection_color: (1,1,1,.4)
     write_tab: False
 
-<Tile>
-
-    canvas.before:
-        Color:
-            rgba: app.trans
-        Rectangle:
-            size: [s+2 for s in self.size]
-
-
-#    Label:
-#        canvas.before:
-#        Color:
-#            rgba: app.bg_color
-#        Rectangle:
-#            size: [s-4 for s in self.size]
-
-
-
-<ThreeBy>
-
-#    canvas.before:
-#        Color:
-#            rgba: .1, 1, 1, .2
-#        Rectangle:
-#            size: self.size
-#            pos: self.pos
-
-
-<ColGuide>
+<GuideLabel>
 
     canvas.before:
         Color:
@@ -224,29 +197,8 @@
             size: self.size
             pos: self.pos
 
-#    size_hint: 1/9, 1
 
-<RowGuide>
-
-    canvas.before:
-        Color:
-            rgba: app.lh_color
-        Rectangle:
-            size: self.size
-            pos: self.pos
-
-#    pos_hint: {'center_x': 0, 'center_y': 0.5}
-
-<BoxGuide>
-
-    canvas.before:
-        Color:
-            rgba: app.lh_color
-        Rectangle:
-            size: self.size
-            pos: self.pos
-
-    opacity: 0
+#    opacity: 0
 
 
 <NineBy>

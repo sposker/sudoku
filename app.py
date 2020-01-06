@@ -2,6 +2,8 @@ from kivy.app import App
 from kivy.clock import Clock, mainthread
 from kivy.core.window import Window
 from kivy.factory import Factory
+from kivy.graphics.context_instructions import Color
+from kivy.graphics.instructions import CanvasBase
 from kivy.uix.behaviors import ButtonBehavior, ToggleButtonBehavior
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
@@ -143,6 +145,14 @@ class TileBackground(Label):
     """Background for entry and value label"""
 
 
+class GuideLabel(Label):
+    """Acts as guide/hightlight around tile"""
+
+    def __init__(self, pos, **kwargs):
+        super().__init__(**kwargs)
+        self.grid_position = pos
+
+
 class Tile(RelativeLayout):
     """Tile holding various widgets for sudoku tile functionality"""
 
@@ -158,11 +168,11 @@ class Tile(RelativeLayout):
         self.directional_focus = {}
         Tile.tiles[self.grid_position] = self
 
-        self.background = TileBackground()
+        self.background = TileBackground(size_hint=(.95, .95))
         self.add_widget(self.background)
 
         self.input = TileInput(size_hint=(.95, .95),
-                               pos_hint={'y': -0.125}
+                               pos_hint={'y': -0.1375}
                                )
         self.input.bind(focus=lambda x, y: self.input.on_focus)
         self.add_widget(self.input)
@@ -253,8 +263,6 @@ class Tile(RelativeLayout):
                 _next = Tile.tiles[(next_x, next_y)]
 
             self.directional_focus[direction] = _next
-
-
 
 
 class TileGuesses(GridLayout):
@@ -381,41 +389,6 @@ class TileLabel(Label):
     """Label displaying tiles' value"""
 
 
-class BoxGuide(Label):
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-
-
-class LinearGuide(Label):
-
-    def __init__(self, _, **kwargs):
-        # self.pos_hint = (None, None)
-        super().__init__(**kwargs)
-
-    @classmethod
-    def create_guide(cls, coord):
-        new = cls(coord)
-        cls.items[coord] = new
-        return new
-
-
-class ColGuide(LinearGuide):
-    items = {}
-
-    def __init__(self, num, **kwargs):
-        super().__init__(None, **kwargs)
-        self.col_pos = num
-
-
-class RowGuide(LinearGuide):
-    items = {}
-
-    def __init__(self, num, **kwargs):
-        super().__init__(None, **kwargs)
-        self.row_pos = num
-
-
 class ThreeBy(RelativeLayout):
     """3x3 grid of tiles"""
 
@@ -461,22 +434,19 @@ class NineBy(FloatLayout):
     def __init__(self, **kw):
         super().__init__(**kw)
         NineBy.instance = self
-        self.guides = False
+        self.show_guides = False
+        self._guides = set()
         self.hint_size = 1 / 3 - .01
         self.offset = (1 / 3 - self.hint_size) * 2 / 3
-
+        self.guide_tiles = {}
+        self.rows = {}
+        self.cols = {}
         self.boxes = {}
-        self.construct()
-        self.rows = RowGuide.items
-        self.cols = ColGuide.items
 
-        for k, v in self.rows.items():
-            print(k, v)
+        self.draw_guides()
+        self.construct()
 
     def construct(self):
-        self.add_linear_guides()
-        self.add_box_guides()
-
         self.fill()
         for widget in self.children:
             try:
@@ -484,6 +454,12 @@ class NineBy(FloatLayout):
             except AttributeError:
                 pass
         self.set_focus_behavior()
+        groups = self.create_guide_groups()
+        self.set_guide_groups(*groups)
+
+        for temp in [self.rows, self.cols, self.boxes]:
+            for k, v in temp.items():
+                print(k, [val.grid_position for val in v])
 
     def fill(self):
 
@@ -496,89 +472,101 @@ class NineBy(FloatLayout):
                 self.add_widget(w)
                 w.make_tiles()
                 w.size_hint = [self.hint_size for _ in range(2)]
+
                 w.pos_hint = {'x': find_offset(horiz), 'y': find_offset(vert)}
 
     def set_focus_behavior(self):
         for grid in self.children:
             for tile in grid.children:
-                tile.set_focus_behavior()
+                try:
+                    tile.set_focus_behavior()
+                except AttributeError:
+                    pass
 
-    def add_linear_guides(self):
+    def draw_guides(self):
 
-        for index, cls in enumerate([RowGuide, ColGuide]):
-            offset = 1 / 18
-            width = (2 / 3 - self.hint_size) / 3
+        for i in range(9):
+            for j in range(9):
+                w = GuideLabel((i, j),
+                               # size_hint=[None, None],
+                               # size_hint=((1/9+self.offset), (1/9+self.offset)),
+                               # pos_hint={'x': (i/9), 'y': (j/9)}
+                               )
+                self.guide_tiles[(i, j)] = w
+                self.add_widget(w)
+                w.text = f'i={i} j={j}'
+                w.size_hint = [(2 / 3 - self.hint_size) / 3 for _ in range(2)]
+                w.pos_hint = {'x': (i / 9), 'y': (j / 9)}
 
-            if index == 0:
-                size_hint = (1, width)
-                delta = 'center_y'
-                constant = 'center_x'
-            else:
-                size_hint = (width, 1)
-                delta = 'center_x'
-                constant = 'center_y'
+    def create_guide_groups(self):
 
-            for i in range(3):
-                for j in range(3):
-                    _index = i * 3 + j
-                    _offset = offset - j * (1 / 3 - self.hint_size) / 18
-                    guide = cls.create_guide(_index)
-                    guide.size_hint = size_hint
-                    guide.pos_hint = {delta: _index / 9 + _offset, constant: .5}
-                    guide.opacity = 0
-                    self.add_widget(guide)
+        c = [set() for _ in range(9)]  # We need to define this twice or we'll get the same values in both dicts
+        r = [set() for _ in range(9)]  # Could also use deepcopy but this is simple
 
-    def add_box_guides(self):
-        width = (2 / 3 - self.hint_size) / 3
+        rows = {k: v for k, v in zip(range(9), r)}
+        cols = {k: v for k, v in zip(range(9), c)}
+        boxes = {}
 
         for x in range(3):
             i, j, k = [x * 3 + _x for _x in range(3)]  # groups of 3 consecutive numbers
             for y in range(3):
                 a, b, c = [y * 3 + _y for _y in range(3)]
-                box = BoxGuide(size_hint=[width * 3 for _ in range(2)],
-                               pos_hint={'x': a / 9 - (1 / 3 - self.hint_size) / 2,
-                                         'y': i / 9 - (1 / 3 - self.hint_size) / 2},
-                               # pos_hint={t:  a/9-(1/3-self.hint_size) for t in ['x', 'y']},
-                               opacity=0,
-                               )
-                self.add_widget(box)
-                for v in [i, j, k]:
-                    for h in [a, b, c]:
-                        self.boxes[h, v] = box
+
+                _boxes = set()
+
+                for h in [i, j, k]:
+                    for v in [a, b, c]:
+                        _boxes.add((h, v))
+
+                boxes[3 * x + y] = _boxes
+
+        return rows, cols, boxes
+
+    def set_guide_groups(self, rows, cols, boxes):
+
+        def linear(_dict, index):
+            for k, v in _dict.items():
+                for pos, tile in self.guide_tiles.items():
+                    if pos[index] == k:
+                        v.add(tile)
+            return _dict
+
+        self.rows = linear(rows, 1)
+        self.cols = linear(cols, 0)
+
+        for key, values in boxes.items():
+            tiles = {self.guide_tiles[coord] for coord in values}
+            for coord in values:
+                self.boxes[coord] = tiles
 
     def trigger_guides(self, pos: (int, int)):
-        if self.guides:
+        if self.show_guides:
             self._trigger_guides(pos)
         pass
 
     def _trigger_guides(self, pos):
-        for row in self.rows.values():
-            row.opacity = 0
-        for col in self.cols.values():
-            col.opacity = 0
-        for box in self.boxes.values():
-            box.opacity = 0
 
-        row = self.rows[pos[1]]
-        col = self.cols[pos[0]]
-        box = self.boxes[pos]
+        highlights = self.cols[pos[0]] | self.rows[pos[1]] | self.boxes[pos]
 
-        row.opacity = 1
-        col.opacity = 1
-        box.opacity = 1
+        for guide in self._guides - highlights:
+            self._recolor_tile(guide, 0)
+
+        for guide in highlights - self._guides:
+            self._recolor_tile(guide, 1)
+
+        self._guides = highlights
+
+    def _recolor_tile(self, tile, value):
+        tile.opacity = value
 
     def guides_on(self):
-        self.guides = True
+        self.show_guides = True
 
     def guides_off(self):
-        self.guides = False
-
-        for row in self.rows.values():
-            row.opacity = 0
-        for col in self.cols.values():
-            col.opacity = 0
-        for box in self.boxes.values():
-            box.opacity = 0
+        self.show_guides = False
+        for tile in self._guides:
+            self._recolor_tile(tile, 0)
+        self._guides = set()
 
 
 class Main(FloatLayout):
