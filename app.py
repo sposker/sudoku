@@ -34,31 +34,24 @@ TEXT_COLOR = (0.6705882352941176, 0.6705882352941176, 0.6705882352941176, 1)  # 
 APP_COLORS = [DARK_HIGHLIGHT, BACKGROUND_COLOR, ELEMENT_COLOR, LIGHT_HIGHLIGHT, TEXT_COLOR]
 
 ITEM_ROW_HEIGHT = 72
-TEXT_BASE_SIZE = 40
+TEXT_BASE_SIZE = 30
 
 Window.size = (round(1440 * 1.618) / 2, 1440 / 2)
 
-
-# Window.borderless = True
+Window.borderless = True
 
 
 class TaskButton(ButtonBehavior, Image):
     """Callback based buttons for logical execution"""
 
-    buttons = {
-        'Hint': None,
-        'Show Hotkeys': None,
-        'Open Puzzle': None,
-        'Solve': None,
-        'Reset': None,
-        'Settings': None,
-    }
+    buttons = {k: None for k in ['Solve', 'Reset', 'Open Puzzle', 'Random', 'Easy', 'Intermediate', 'Expert']}
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        Clock.schedule_once(self._register_callbacks)  # ensure app is running before trying to resolve references
 
-    def _register_callbacks(self, _):
+        Clock.schedule_once(self.register_callbacks)  # ensure app is running before trying to resolve references
+
+    def register_callbacks(self, _):
         """Assign callbacks to buttons *after* app has been built"""
         app = App.get_running_app()
         self.buttons['Solve'] = app.root.start_second_thread
@@ -72,7 +65,7 @@ class TaskButton(ButtonBehavior, Image):
     def task_button_callback(self, button_text):
         try:
             callback = self.buttons[button_text]
-            callback.__call__()
+            callback()
         except AttributeError:
             print(f'No callback present for <{button_text}>.')
         except KeyError:
@@ -437,68 +430,27 @@ class NineBy(FloatLayout):
         self.show_guides = False
         self._guides = set()
         self.hint_size = 1 / 3 - .01
-        self.offset = (1 / 3 - self.hint_size) * 2 / 3
         self.guide_tiles = {}
         self.rows = {}
         self.cols = {}
         self.boxes = {}
 
-        self.draw_guides()
+        self._draw_guides()
         self.construct()
 
     def construct(self):
-        self.fill()
+        self._fill()
         for widget in self.children:
             try:
                 widget.populate_tiles()
             except AttributeError:
                 pass
-        self.set_focus_behavior()
-        groups = self.create_guide_groups()
-        self.set_guide_groups(*groups)
+        self._set_focus_behavior()
+        groups = self._create_guide_groups()
+        self._set_guide_groups(*groups)
 
-        for temp in [self.rows, self.cols, self.boxes]:
-            for k, v in temp.items():
-                print(k, [val.grid_position for val in v])
-
-    def fill(self):
-
-        def find_offset(n: int) -> float:
-            return ((n * 1.0025 + 2 * self.offset) + 0.01 * (1 - n)) / 3
-
-        for vert in range(3):
-            for horiz in range(3):
-                w = ThreeBy((horiz, vert))
-                self.add_widget(w)
-                w.make_tiles()
-                w.size_hint = [self.hint_size for _ in range(2)]
-
-                w.pos_hint = {'x': find_offset(horiz), 'y': find_offset(vert)}
-
-    def set_focus_behavior(self):
-        for grid in self.children:
-            for tile in grid.children:
-                try:
-                    tile.set_focus_behavior()
-                except AttributeError:
-                    pass
-
-    def draw_guides(self):
-
-        for i in range(9):
-            for j in range(9):
-                w = GuideLabel((i, j),
-                               # size_hint=[None, None],
-                               # size_hint=((1/9+self.offset), (1/9+self.offset)),
-                               # pos_hint={'x': (i/9), 'y': (j/9)}
-                               )
-                self.guide_tiles[(i, j)] = w
-                self.add_widget(w)
-                w.text = f'i={i} j={j}'
-                w.size_hint = [(2 / 3 - self.hint_size) / 3 for _ in range(2)]
-                w.pos_hint = {'x': (i / 9), 'y': (j / 9)}
-
-    def create_guide_groups(self):
+    @staticmethod
+    def _create_guide_groups():
 
         c = [set() for _ in range(9)]  # We need to define this twice or we'll get the same values in both dicts
         r = [set() for _ in range(9)]  # Could also use deepcopy but this is simple
@@ -522,7 +474,41 @@ class NineBy(FloatLayout):
 
         return rows, cols, boxes
 
-    def set_guide_groups(self, rows, cols, boxes):
+    def _draw_guides(self):
+
+        for i in range(9):
+            for j in range(9):
+                (qx, rx), (qy, ry) = divmod(i, 3), divmod(j, 3)
+                w = GuideLabel((i, j),
+                               size_hint=[(2 / 3 - self.hint_size) / 3 for _ in range(2)],
+                               pos_hint={'x': ((i - (qx + rx) * .025) / 9), 'y': ((j - (qy + ry) * .025) / 9)},
+                               opacity=0,
+                               )
+                self.guide_tiles[(i, j)] = w
+                self.add_widget(w)
+
+    def _fill(self):
+        for vert in range(3):
+            for horiz in range(3):
+                w = ThreeBy((horiz, vert))
+                self.add_widget(w)
+                w.make_tiles()
+                w.size_hint = [self.hint_size for _ in range(2)]
+
+                w.pos_hint = {'x': self._find_offset(horiz), 'y': self._find_offset(vert)}
+
+    def _find_offset(self, n: int) -> float:
+        return ((n * 1.0025 + 2 * ((1 / 3 - self.hint_size) * 2 / 3)) + 0.01 * (1 - n)) / 3
+
+    def _set_focus_behavior(self):
+        for grid in self.children:
+            for tile in grid.children:
+                try:
+                    tile.set_focus_behavior()
+                except AttributeError:
+                    pass
+
+    def _set_guide_groups(self, rows, cols, boxes):
 
         def linear(_dict, index):
             for k, v in _dict.items():
@@ -539,10 +525,9 @@ class NineBy(FloatLayout):
             for coord in values:
                 self.boxes[coord] = tiles
 
-    def trigger_guides(self, pos: (int, int)):
-        if self.show_guides:
-            self._trigger_guides(pos)
-        pass
+    # noinspection PyMethodMayBeStatic
+    def _recolor_tile(self, tile, value):
+        tile.opacity = value
 
     def _trigger_guides(self, pos):
 
@@ -556,9 +541,6 @@ class NineBy(FloatLayout):
 
         self._guides = highlights
 
-    def _recolor_tile(self, tile, value):
-        tile.opacity = value
-
     def guides_on(self):
         self.show_guides = True
 
@@ -567,6 +549,10 @@ class NineBy(FloatLayout):
         for tile in self._guides:
             self._recolor_tile(tile, 0)
         self._guides = set()
+
+    def trigger_guides(self, pos: (int, int)):
+        if self.show_guides:
+            self._trigger_guides(pos)
 
 
 class Main(FloatLayout):
@@ -601,8 +587,8 @@ class Main(FloatLayout):
 
     @staticmethod
     def puzzle_picker():
-        PuzzlePicker.current = Factory.PuzzlePicker()
-        PuzzlePicker.current.open()
+        PuzzlePicker.instance = Factory.PuzzlePicker()
+        PuzzlePicker.instance.open()
 
 
 class PuzzleRandomLayout(FloatLayout):
@@ -612,32 +598,32 @@ class PuzzleRandomLayout(FloatLayout):
 class PuzzlePicker(Popup):
     """Popup for choosing puzzles"""
 
-    current = None
+    instance = None
 
     @staticmethod
     def random():
-        return PuzzlePicker.current._random()
+        return PuzzlePicker.instance.real_random()
 
     @staticmethod
     def easy():
-        return PuzzlePicker.current._random(difficulty='easy')
+        return PuzzlePicker.instance.real_random(difficulty='easy')
 
     @staticmethod
     def med():
-        return PuzzlePicker.current._random(difficulty='medium')
+        return PuzzlePicker.instance.real_random(difficulty='medium')
 
     @staticmethod
     def hard():
-        return PuzzlePicker.current._random(difficulty='hard')
+        return PuzzlePicker.real_random(difficulty='hard')
 
     @staticmethod
-    def _random(difficulty=None):
+    def real_random(difficulty=None):
         app = App.get_running_app()
         puzzle = app.db.random_puzzle(difficulty)
         app.board = Board(puzzle=puzzle)
         NineBy.instance.children.clear()
         NineBy.instance.construct()
-        PuzzlePicker.current.dismiss()
+        PuzzlePicker.instance.dismiss()
 
 
 class SudokuSolverApp(App):
@@ -663,12 +649,13 @@ class SudokuSolverApp(App):
     text_color_string = as_string(text_color)
     text_color_list = as_list(text_color)
 
-    # End Config properties
+    # End Color properties
     # Begin Misc
 
     trans = (1, 1, 1, 0)
     trans_string = '1, 1, 1, 0'
     trans_list = [1, 1, 1, 0]
+    text_size = TEXT_BASE_SIZE
 
     hint_text_color = (0.6705882352941176, 0.6705882352941176, 0.6705882352941176, .1)
     board = {}
@@ -731,8 +718,8 @@ class SudokuSolverApp(App):
         for i in range(1, 10):
             self.root.update_values()
             self.solve_iter_count += 1
-            print(i)
-            # time.sleep(.0001)
+            print(i)  # For whatever reason, printing gives the window time to update itself, so don't remove this
+
             tile.value = i
 
             if not self.board.validate(tile):
@@ -758,17 +745,6 @@ class SudokuSolverApp(App):
             Tile.tiles[pos].label.text = str(val) if val else ''
             Tile.tiles[pos].label.color = self.text_color
             Tile.tiles[pos].input.text = ''
-
-    # def set_board(self, difficulty=None, uid=None):
-    #     if uid:
-    #         puzzle = self.db.all_puzzles[uid]
-    #     elif difficulty:
-    #         puzzle = self.db.random_puzzle()
-    #     else:
-    #         puzzle = self.db.blank_puzzle
-    #
-    #     self.board = Board(puzzle)
-    #     self.reset()
 
     def on_stop(self):
         # The Kivy event loop is about to stop, set a stop signal;

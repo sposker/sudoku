@@ -86,7 +86,7 @@
         pos_hint: {'x': 0, 'y': 0}
         color: app.text_color
         text: self.parent.pair_name
-        font_size: 18
+        font_size: .6*app.text_size
 #        halign: 'left'
 
     PanelToggle:
@@ -127,7 +127,7 @@
         color: 0,0,0,1
         text: "Solving Sudokus\n  (with snakes)"
         bold: True
-        font_size: 30
+        font_size: app.text_size
         size_hint: .6, .15
         pos_hint: {'x': .4, 'y': .775}
 
@@ -137,18 +137,14 @@
         pair_name: 'Show Guides'
         toggle_on_cb: self.guides_on
         toggle_off_cb: self.guides_off
+
     ToggleLayout:
         pos_hint: {'x': .05, 'y': .475}
         pair_name: 'Realtime Inspection'
         toggle_on_cb: self.inspections_on
         toggle_off_cb: self.inspections_off
 
-
     TaskButtonGrid:
-
-<Tile>
-
-
 
 <TileLabel>
 
