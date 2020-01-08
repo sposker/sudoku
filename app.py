@@ -22,6 +22,7 @@ from kivy.uix.togglebutton import ToggleButton
 
 from classes import Board
 from database import Database
+from hotkeys import HotKeyboard
 from __init__ import *
 import re
 import threading
@@ -311,34 +312,36 @@ class TileGuesses(GridLayout):
 class TileInput(TextInput):
     """Widget that allows setting values"""
 
-    pat = re.compile('[^1-9]')
-    numeric = {i for i in range(257, 266)} | {i for i in range(49, 58)} | {1073741980}
+    _hotkey_logic = HotKeyboard()
 
-    num_codes = {
-        (260, 'numpad4'): (-1, 0),
-        (264, 'numpad8'): (0, 1),
-        (262, 'numpad6'): (1, 0),
-        (258, 'numpad2'): (0, -1),
-        (257, 'numpad1'): (-1, -1),
-        (259, 'numpad3'): (1, -1),
-        (263, 'numpad7'): (-1, 1),
-        (265, 'numpad9'): (1, 1),
-    }
-    codes = {
-        (273, 'up'): (0, 1),
-        (276, 'left'): (-1, 0),
-        (274, 'down'): (0, -1),
-        (275, 'right'): (1, 0),
-    }
-    keystrokes = {
-        'up',
-        'down',
-        'left',
-        'right',
-    }
-    for num in range(1, 10):
-        keystrokes.add(str(num))
-        keystrokes.add(f'numpad{num}')
+    pat = re.compile('[^1-9]')
+    # numeric = {i for i in range(257, 266)} | {i for i in range(49, 58)} | {1073741980}
+    #
+    # num_codes = {
+    #     (260, 'numpad4'): (-1, 0),
+    #     (264, 'numpad8'): (0, 1),
+    #     (262, 'numpad6'): (1, 0),
+    #     (258, 'numpad2'): (0, -1),
+    #     (257, 'numpad1'): (-1, -1),
+    #     (259, 'numpad3'): (1, -1),
+    #     (263, 'numpad7'): (-1, 1),
+    #     (265, 'numpad9'): (1, 1),
+    # }
+    # codes = {
+    #     (273, 'up'): (0, 1),
+    #     (276, 'left'): (-1, 0),
+    #     (274, 'down'): (0, -1),
+    #     (275, 'right'): (1, 0),
+    # }
+    # keystrokes = {
+    #     'up',
+    #     'down',
+    #     'left',
+    #     'right',
+    # }
+    # for num in range(1, 10):
+    #     keystrokes.add(str(num))
+    #     keystrokes.add(f'numpad{num}')
 
     app = None
 

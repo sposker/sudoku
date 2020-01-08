@@ -11,10 +11,10 @@ class HotKeyboard:
 
 
     """
-    arrows = {n for n in range(273, 277)}
+    arrows = [n for n in range(273, 277)]
     entry = [n for n in range(49, 58)]
-    entrypad = [n for n in range(257, 266)]
-    pad_to_nums = {k: v for k, v in zip(entrypad, entry)}
+    numpad = [n for n in range(257, 266)]
+    pad_to_nums = {k: v for k, v in zip(numpad, entry)}
 
     def __init__(self):
         self.master = {}
@@ -28,32 +28,67 @@ class HotKeyboard:
 
                 self.master[int(code)] = key
 
+                self.moves_table = {
+                    # up, down, right, left
+                    273: (0, 1),
+                    274: (0, -1),
+                    275: (1, 0),
+                    276: (-1, 0),
+                    # numpad 1, 2, 3, 4, 6, 7, 8, 9
+                    257: (-1, -1),
+                    258: (0, -1),
+                    259: (1, -1),
+                    260: (-1, 0),
+                    262: (1, 0),
+                    263: (-1, 1),
+                    264: (0, 1),
+                    265: (1, 1),
+                }
+
     def __call__(self, keycode: (int, str), modifiers: list):
         if modifiers is None:
             modifiers = []
 
-        self.resolve_modifiers(keycode[0], sorted(modifiers))
+        callback, code = self.resolve_modifiers(keycode[0], sorted(modifiers))
+        # TODO: Call with some parameters
+        # TODO: get from other module
 
     def resolve_modifiers(self, code, mods):
-        if 'numlock' in mods:
+        try:
             mods.pop(mods.index('numlock'))
-            code = self.pad_to_nums[code]
-        if len(mods) != 1:
-            return self.jump(code)
-        if mods[0] == 'alt':
-            return self.guesses(code)
-        if mods[0] == 'ctrl':
-            return self.move(code, locks=False)
+        except ValueError:
+            pass
+        else:
+            if not mods:  # If numlock was popped as the only modifier
+                code = self.pad_to_nums[code]
+                return self.enter, code
 
-    keystrokes = {
-        'up',
-        'down',
-        'left',
-        'right',
-    }
-    for num in range(1, 10):
-        keystrokes.add(str(num))
-        keystrokes.add(f'numpad{num}')
+        if mods[:2] == ['alt', 'ctrl']:
+            return self.jump, code
+        if mods[0] == 'alt':
+            return self.guesses, code
+        if mods[0] == 'ctrl':
+            return self.into_locks, code
+        if code in self.entry:
+            return self.enter, code
+        if code in self.numpad:
+            return self.move, code
+
+    @staticmethod
+    def enter(code):
+        ...
+
+    def jump(self):
+        ...
+
+    def guesses(self):
+        ...
+
+    def into_locks(self):
+        ...
+
+    def move(self):
+        ...
 
 
 print('_'.join(sorted(['numlock', 'shift', 'alt', 'ctrl', 'shift'])))
