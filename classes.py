@@ -164,6 +164,26 @@ class Board:
                 matches.add(other.position)
         return matches
 
+    def generate_hint(self):
+        empties = {tile for tile in self.tiles.values() if tile.value is None}
+        for tile in empties:
+            results = []
+            for val in range(1, 10):
+                tile.value = val
+                results.append(self.validate(tile))
+
+            if results.count(set()) == 1:
+                tile.value = results.index(set())
+                break
+            else:
+                tile.value = None
+        else:
+            print("no hint found")
+            return
+        return tile.grid_position
+
+
+
 # tuples = []
 # for i in range(9):
 #     for j in range(9):

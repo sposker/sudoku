@@ -62,6 +62,7 @@ class TaskButton(ButtonBehavior, Image):
         self.buttons['Easy'] = PuzzlePicker.easy
         self.buttons['Intermediate'] = PuzzlePicker.med
         self.buttons['Expert'] = PuzzlePicker.hard
+        self.buttons['Hint'] = app.find_hint
 
     def task_button_callback(self, button_text):
         try:
@@ -184,6 +185,9 @@ class Tile(RelativeLayout):
                                    )
         self.add_widget(self.guesses)
 
+    def __str__(self):
+        return f'Tile object at position ({self.grid_position[0]}, {self.grid_position[1]}).'
+
 
 class TileGuesses(GridLayout):
     """Holds guesses"""
@@ -196,7 +200,8 @@ class TileGuesses(GridLayout):
                            color=TEXT_COLOR,
                            opacity=0)
             self.add_widget(_label)
-            self.labels[i+48] = _label  # +48 Matches keycodes
+            self.labels[i+48] = _label  # +48 matches 1-9 keycodes
+            self.labels[i+256] = _label  # +256 matches numpad keycodes•
 
     def toggle_opacity(self, val):
         label = self.labels[int(val)]
@@ -223,10 +228,11 @@ class TileInput(TextInput, HotKeyboard):
         args = window, keycode, text, modifiers
         result = self.evaluate_input(keycode, modifiers)
         try:
-            result.focus = True
+            result.input.focus = True
         except AttributeError:  # We didn't return a tile; either input or unknown keypress
             return super().keyboard_on_key_down(*args)
         else:
+            print(result)
             return True  # Keypress was consumed
 
     def on_focus(self, _, value):
@@ -272,6 +278,12 @@ class TileInput(TextInput, HotKeyboard):
 
     def _trigger_guides(self):
         NineBy.instance.trigger_guides(self.parent.grid_position)
+
+    def get_focus_next(self):
+        return self.hotkey_next_focus()
+
+    def get_focus_previous(self):
+        return self.hotkey_focus_previous()
 
 
 class TileLabel(Label):
@@ -513,6 +525,9 @@ class PuzzlePicker(Popup):
         PuzzlePicker.instance.dismiss()
 
 
+# class HotkeysPopup(Popup):
+
+
 class SudokuSolverApp(App):
     # Config Properties
 
@@ -595,6 +610,11 @@ class SudokuSolverApp(App):
         self.solve_iter_count = 0
         self._slow_solve(tiles)
         print(self.solve_iter_count)
+
+    def find_hint(self):
+        pos = self.board.generate_hint()
+        tile = Tile.tiles[pos]
+        tile.label.color = [(.6, .3, .3, 1)]
 
     def _slow_solve(self, tiles):
 

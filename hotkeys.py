@@ -5,9 +5,9 @@ It is strongly recommended to change your behaviors from CONFIG rather than dire
 
 class HotKeyboard:
     """
-    mods: numlock, ctrl, alt, shift (only for tab)
+    mods: numlock, ctrl, alt, shift
 
-    keys: 1-9, numpad1-9, letters with ctrl
+    keys: 1-9, numpad1-9, letters with ctrl, tab
 
 
     """
@@ -15,7 +15,7 @@ class HotKeyboard:
     entry = [n for n in range(49, 58)]
     numpad = [n for n in range(257, 266)]
     pad_to_nums = {k: v for k, v in zip(numpad, entry)}
-    special_keys = arrows + entry + numpad
+    special_keys = arrows + entry + numpad + [9]
     parent = None  # Only needed for subclass
 
     def __init__(self):
@@ -68,34 +68,78 @@ class HotKeyboard:
         if modifiers is None:
             modifiers = []
 
+        print(*keycode, *modifiers)
+
         callback, args = self.resolve_modifiers(keycode[0], sorted(modifiers))
-        return callback(*args)
+        return callback(args)
 
     def resolve_modifiers(self, code, mods):
-        try:
-            mods.pop(mods.index('numlock'))
-        except ValueError:
-            pass
-        else:
-            if not mods:  # If numlock was popped as the only modifier
-                code = self.pad_to_nums[code]
-                return self.enter, code
-
-        if mods[:2] == ['alt', 'ctrl']:
-            return self.jump, [code]
-        if mods[0] == 'alt':
-            return self.guesses, [code]
-        if mods[0] == 'ctrl':
-            return self.into_locks, [code]
-        if code in self.entry:
-            return self.enter, []
-        if code in self.numpad:
-            return self.move, [code]
-        if code == 9:  # TAB
+        mods = set(mods) & {'shift', 'numlock', 'ctrl', 'alt'}  # sanitize scroll lock, caps lock, etc.
+        if 'numlock' in mods:
             try:
-                return self.on_tab, [mods[0]]
-            except IndexError:
-                return self.on_tab, []
+                code = self.pad_to_nums[code]
+            except KeyError:
+                pass
+
+        if 'alt' in mods and code in self.entry:
+            callback = self.guesses
+        elif code in self.entry:
+            callback = self.enter
+        elif code in self.arrows or code in self.moves_table:
+            if 'ctrl' in mods and 'shift' in mods:
+                callback = self.jump
+            elif 'ctrl' in mods:
+                callback = self.into_locks
+            else:
+                callback = self.move
+        elif code == 9:
+            if 'shift' in mods:
+                callback = self.hotkey_focus_previous
+            else:
+                callback = self.hotkey_next_focus
+        else:
+            print('Returning do_pass.')
+            callback = self.do_pass
+
+        return callback, code
+
+        # try:
+        #     mods.pop(mods.index('numlock'))
+        #     code = self.pad_to_nums[code]
+        # except ValueError:
+        #     if not mods:
+        #         if code in {261, 256}:
+        #             return self.handle_special, [code]
+        #         elif code in self.numpad or code in self.arrows:
+        #             return self.move, [code]
+        #         elif code == 9:
+        #             return self.on_tab, [code]
+        #         return self.enter, [code]
+        # except KeyError:
+        #     return self.move, [code]
+        # else:
+        #     if not mods:  # If numlock was popped as the only modifier
+        #         return self.enter, [code]
+        #
+        # if mods[:2] == ['ctrl', 'shift']:
+        #     return self.jump, [code]
+        # if mods[0] == 'alt':
+        #     return self.guesses, [code]
+        # if mods[0] == 'ctrl':
+        #     return self.into_locks, [code]
+        # if code in self.entry:
+        #     return self.enter, []
+        # if code in self.numpad:
+        #     return self.move, [code]
+        # if code == 9:  # TAB
+        #     print('code=9')
+        #     try:
+        #         return self.on_tab, [mods[0]]
+        #     except IndexError:
+        #         return self.on_tab, []
+        # else:
+        #     print('edge_case')
+        #     return self.do_pass, [code]
 
     def enter(self, code):
         return code  # Handle this basic case in input class
@@ -107,27 +151,41 @@ class HotKeyboard:
         _x, _y = tile.grid_position
         dx, dy = direction
 
-        while _x in range(1, 8) and _y in range(1, 8):
+        conditons = {'x': [0, 8],
+                     'y': [0, 8]}
+
+        if _x == 0 and dx == 0:
+            conditons['x'] = [8]
+        elif _x == 8 and dx == 0:
+            conditons['x'] = [0]
+        if _y == 0 and dy == 0:
+            conditons['y'] = [8]
+        elif _y == 8 and dy == 0:
+            conditons['y'] = [0]
+
+        while True:
             _x += dx
             _y += dy
-
-        edge_tile = tiles[(_x, _y)]
-        if edge_tile.locked:
-            reverse = self.opposites[code]
-            return self.move(reverse)
-        return edge_tile
+            try:
+                tile = tiles[(_x, _y)]
+            except KeyError:
+                return tile
+            else:
+                if _x in conditons['x'] or _y in conditons['y']:
+                    return tile
 
     def guesses(self, code):
         tile = self.parent
-        label = tile.guesses.labels[code]
-        label.toggle_opacity()
-        # TODO
+        try:
+            tile.guesses.toggle_opacity(code)
+        except KeyError:
+            return None
         return tile
 
     def into_locks(self, code):
-        return self.move(code, condition=(False,))
+        return self.move(code, condition=('soft', False,))
 
-    def move(self, code, condition=('soft', False)):
+    def move(self, code, condition=(False,)):
         direction = self.moves_table[code]
         tile = self.parent
         tiles = tile.tiles
@@ -136,18 +194,14 @@ class HotKeyboard:
         next_x, next_y = self._calculate_directional_focus(_x, _y, direction)
         _next = tiles[(next_x, next_y)]
 
-        while _next.locked in condition:
+        while _next.locked not in condition:
+
             next_x, next_y = self._calculate_directional_focus(next_x, next_y, direction)
             _next = tiles[(next_x, next_y)]
 
         return _next
 
-    def on_tab(self, *args):  # TODO: soft/hard locks?
-        if args:
-            return self.get_focus_previous()
-        return self.get_focus_next()
-
-    def get_focus_previous(self):
+    def hotkey_focus_previous(self, _):
         prev_x, prev_y = self._calculate_prev_focus(*self.parent.grid_position)
         _prev = self.parent.tiles[(prev_x, prev_y)]
 
@@ -157,7 +211,7 @@ class HotKeyboard:
 
         return _prev
 
-    def get_focus_next(self):
+    def hotkey_next_focus(self, _):
 
         next_x, next_y = self._calculate_next_focus(*self.parent.grid_position)
         _next = self.parent.tiles[(next_x, next_y)]
@@ -213,3 +267,9 @@ class HotKeyboard:
             dy_next = 8
 
         return dx_next, dy_next
+
+    def do_pass(self, code):
+        return code
+
+    def handle_special(self, code):
+        print(f'Special: {code}')
