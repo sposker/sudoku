@@ -184,109 +184,6 @@ class Tile(RelativeLayout):
                                    )
         self.add_widget(self.guesses)
 
-    def get_focus(self, style, soft=False, jump=False):
-
-        locks = {'hard'}
-        if not soft:
-            locks.add('soft')
-
-        if jump:
-            self._do_jump(style, locks)
-
-        if style == 'next':
-            return self.get_focus_next(locks)
-        elif style == 'previous':
-            return self.get_focus_previous(locks)
-        else:  # Tuple
-            return self.get_focus_directional(locks, style)
-
-    def get_focus_next(self, locks):
-
-        next_x, next_y = self._calculate_next_focus(*self.grid_position)
-        _next = Tile.tiles[(next_x, next_y)]
-
-        while _next.locked in locks:
-            next_x, next_y = self._calculate_next_focus(next_x, next_y)
-            _next = Tile.tiles[(next_x, next_y)]
-
-        return _next
-
-    def get_focus_previous(self, locks):
-        prev_x, prev_y = self._calculate_prev_focus(*self.grid_position)
-        _prev = Tile.tiles[(prev_x, prev_y)]
-
-        while _prev.locked in locks:
-            prev_x, prev_y = self._calculate_prev_focus(prev_x, prev_y)
-            _prev = Tile.tiles[(prev_x, prev_y)]
-
-        return _prev
-
-    def get_focus_directional(self, locks, direction, attr='locked'):
-
-        _x, _y = self.grid_position
-        next_x, next_y = self._calculate_directional_focus(_x, _y, direction)
-        _next = Tile.tiles[(next_x, next_y)]
-
-        while getattr(_next, attr) in locks:
-            next_x, next_y = self._calculate_directional_focus(next_x, next_y, direction)
-            _next = Tile.tiles[(next_x, next_y)]
-
-        return _next
-
-    def _do_jump(self, direction, locks):
-
-        edge = self.get_focus_directional({False}, direction, attr='on_border')
-        if edge.locked in locks:
-            x, y = -direction[0], -direction[1]
-            return self.get_focus_directional(locks, (x, y))
-        return edge
-
-    @staticmethod
-    def _calculate_next_focus(x, y):
-
-        dx_next = x + 1
-        dy_next = y
-
-        if dx_next == 9:
-            dx_next = 0
-            dy_next = y - 1
-
-        if dy_next == -1:
-            dy_next = 8
-
-        return dx_next, dy_next
-
-    @staticmethod
-    def _calculate_prev_focus(x, y):
-
-        dx_prev = x - 1
-        dy_prev = y
-
-        if dx_prev == -1:
-            dx_prev = 8
-            dy_prev = y + 1
-
-        if dy_prev == 9:
-            dy_prev = 0
-
-        return dx_prev, dy_prev
-
-    @staticmethod
-    def _calculate_directional_focus(x, y, delta: (int, int)):
-        dx = x + delta[0]
-        dy = y + delta[1]
-
-        if dx == -1:
-            dx = 8
-        elif dx == 9:
-            dx = 0
-        if dy == -1:
-            dy = 8
-        elif dy == 9:
-            dy = 0
-
-        return dx, dy
-
 
 class TileGuesses(GridLayout):
     """Holds guesses"""
@@ -299,7 +196,7 @@ class TileGuesses(GridLayout):
                            color=TEXT_COLOR,
                            opacity=0)
             self.add_widget(_label)
-            self.labels[i] = _label
+            self.labels[i+48] = _label  # +48 Matches keycodes
 
     def toggle_opacity(self, val):
         label = self.labels[int(val)]
@@ -309,40 +206,10 @@ class TileGuesses(GridLayout):
             label.opacity = 0.
 
 
-class TileInput(TextInput):
+class TileInput(TextInput, HotKeyboard):
     """Widget that allows setting values"""
 
-    _hotkey_logic = HotKeyboard()
-
     pat = re.compile('[^1-9]')
-    # numeric = {i for i in range(257, 266)} | {i for i in range(49, 58)} | {1073741980}
-    #
-    # num_codes = {
-    #     (260, 'numpad4'): (-1, 0),
-    #     (264, 'numpad8'): (0, 1),
-    #     (262, 'numpad6'): (1, 0),
-    #     (258, 'numpad2'): (0, -1),
-    #     (257, 'numpad1'): (-1, -1),
-    #     (259, 'numpad3'): (1, -1),
-    #     (263, 'numpad7'): (-1, 1),
-    #     (265, 'numpad9'): (1, 1),
-    # }
-    # codes = {
-    #     (273, 'up'): (0, 1),
-    #     (276, 'left'): (-1, 0),
-    #     (274, 'down'): (0, -1),
-    #     (275, 'right'): (1, 0),
-    # }
-    # keystrokes = {
-    #     'up',
-    #     'down',
-    #     'left',
-    #     'right',
-    # }
-    # for num in range(1, 10):
-    #     keystrokes.add(str(num))
-    #     keystrokes.add(f'numpad{num}')
-
     app = None
 
     def __init__(self, **kwargs):
@@ -352,79 +219,15 @@ class TileInput(TextInput):
         super().__init__(**kwargs)
 
     def keyboard_on_key_down(self, window, keycode, text, modifiers):
-        """ Private helper methods should return True if they have consumed the keypress;
-            super().keyboard_on_key_down will also return True when it consumes the keypress.
-            """
 
         args = window, keycode, text, modifiers
-        print(args[1:])
-
-        if text not in self.keystrokes:
-            return super().keyboard_on_key_down(*args)
-
-        if not modifiers:
-            _returned = self._with_base(*args)
-
-        elif 'alt' in modifiers and 'ctrl' in modifiers:
-            _returned = self._request_focus(keycode, jump=True)
-
-        elif 'alt' in modifiers:
-            if keycode[0] in self.numeric:
-                value = (keycode[1])[-1]  # last digit of string
-                self.parent.guesses.toggle_opacity(value)
-                return True
-
-        elif 'ctrl' in modifiers:
-            _returned = False
-
-        elif 'numlock' in modifiers:
-            if keycode not in self.num_codes:
-                _returned = self._with_base(*args)
-            else:
-                key = self.num_codes[keycode]
-                widget = self.parent.get_focus(key)
-                self.focus = False
-                widget.input.focus = True
-                return True
-
-        elif 'shift' in modifiers and keycode == (9, 'tab'):
-            # noinspection PyNoneFunctionAssignment
-            _returned = self._with_shift(*args)
-
-        # noinspection PyUnboundLocalVariable
-        if not _returned:
-            return super().keyboard_on_key_down(window, keycode, text, modifiers)
-        else:
-            return True
-
-    def _with_base(self, window, keycode, text, modifiers):
-        if keycode in self.codes.keys():
-            key = self.codes[keycode]
-            widget = self.parent.get_focus(key)
-            self.focus = False
-            widget.input.focus = True
-            return True
-
-        elif keycode == (13, 'enter'):
-            return super().keyboard_on_key_down(window, (9, 'tab'), text, modifiers)
-
-    def _with_ctrl(self, window, keycode, text, modifiers):
-        ...
-
-    def _with_shift(self, window, keycode, text, modifiers):
-
-        if keycode == (9, 'tab'):
-            return self.get_focus_previous()
-        return None
-
-    def _request_focus(self, key, jump=False):
+        result = self.evaluate_input(keycode, modifiers)
         try:
-            value = self.codes[key]
-        except KeyError:
-            value = self.num_codes[key]
-        tile = self.parent.get_focus(value, jump=jump)
-        tile.input.focus = True
-        return True
+            result.focus = True
+        except AttributeError:  # We didn't return a tile; either input or unknown keypress
+            return super().keyboard_on_key_down(*args)
+        else:
+            return True  # Keypress was consumed
 
     def on_focus(self, _, value):
         if value:
@@ -442,14 +245,6 @@ class TileInput(TextInput):
             self.text = ''
         s = re.sub(pat, '', substring)
         return super(TileInput, self).insert_text(s, from_undo=from_undo)
-
-    def get_focus_next(self):
-        tile = self.parent.get_focus('next')
-        tile.input.focus = True
-
-    def get_focus_previous(self):
-        tile = self.parent.get_focus('previous')
-        tile.input.focus = True
 
     def set_text(self, text):
         setattr(self.parent.label, 'text', text)
