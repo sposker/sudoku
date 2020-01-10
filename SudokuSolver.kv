@@ -207,6 +207,30 @@
             size: self.size
             pos: self.pos
 
+<HotkeysDisplay>
+
+    canvas.before:
+        Color:
+            rgba: 0, 0, 0, .75
+        Rectangle:
+            size: self._window.size if self._window else (0, 0)
+        Color:
+            rgba: 0,0,0,.1
+        Rectangle:
+            size: self.size
+            pos: self.pos
+
+    background_color: app.trans
+    separator_color: app.trans
+    size_hint: (None, None)
+    size: (600, 400)
+    title: ''
+    title_size: 0
+
+    FloatLayout:
+
+        
+
 <PuzzlePicker>
 
     canvas.before:

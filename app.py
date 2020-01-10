@@ -63,6 +63,7 @@ class TaskButton(ButtonBehavior, Image):
         self.buttons['Intermediate'] = PuzzlePicker.med
         self.buttons['Expert'] = PuzzlePicker.hard
         self.buttons['Hint'] = app.find_hint
+        self.buttons['Show Hotkeys'] = HotkeysDisplay.show
 
     def task_button_callback(self, button_text):
         try:
@@ -525,8 +526,11 @@ class PuzzlePicker(Popup):
         PuzzlePicker.instance.dismiss()
 
 
-# class HotkeysPopup(Popup):
+class HotkeysDisplay(Popup):
+    """Static widget displayinging availible hotkeys"""
 
+    def show(self):
+        Factory.HotkeysPopup().open()
 
 class SudokuSolverApp(App):
     # Config Properties
