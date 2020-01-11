@@ -38,7 +38,9 @@ ITEM_ROW_HEIGHT = 72
 TEXT_BASE_SIZE = 30
 
 Window.size = (round(1440 * 1.618) / 2, 1440 / 2)
-
+Window.position = 'custom'
+Window.left = 100
+Window.top = 50
 Window.borderless = True
 
 
@@ -117,10 +119,8 @@ class ToggleLayout(FloatLayout):
     def inspections_off():
         app = App.get_running_app()
         setattr(app, 'inspections', False)
-        if Tile.conflicts:
-            for pos in Tile.conflicts:
-                tile = Tile.tiles[pos]
-                tile.label.color = app.text_color
+        for tile in Tile.tiles.values():
+            tile.label.color = app.text_color
         Tile.conflicts = None
 
 
@@ -136,6 +136,20 @@ class PanelToggle(ToggleButton):
 
 class Panel(FloatLayout):
     """Holds buttons on sidebar"""
+
+    instance = None
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.puzzle_id = Label(size_hint=(.2, .1),
+                               pos_hint={'x': .1, 'y': 0},
+                               font_size=18,
+                               color=TEXT_COLOR,
+                               text='',
+                               )
+        self.add_widget(self.puzzle_id)
+
+        Panel.instance = self
 
 
 class TileBackground(Label):
@@ -201,8 +215,8 @@ class TileGuesses(GridLayout):
                            color=TEXT_COLOR,
                            opacity=0)
             self.add_widget(_label)
-            self.labels[i+48] = _label  # +48 matches 1-9 keycodes
-            self.labels[i+256] = _label  # +256 matches numpad keycodes•
+            self.labels[i + 48] = _label  # +48 matches 1-9 keycodes
+            self.labels[i + 256] = _label  # +256 matches numpad keycodes•
 
     def toggle_opacity(self, val):
         label = self.labels[int(val)]
@@ -523,14 +537,20 @@ class PuzzlePicker(Popup):
         app.board = Board(puzzle=puzzle)
         NineBy.instance.children.clear()
         NineBy.instance.construct()
+        Panel.instance.puzzle_id.text = f'Puzzle ID: {puzzle.uid}'
         PuzzlePicker.instance.dismiss()
 
 
 class HotkeysDisplay(Popup):
     """Static widget displayinging availible hotkeys"""
 
-    def show(self):
-        Factory.HotkeysPopup().open()
+    instance = None
+
+    @staticmethod
+    def show():
+        HotkeysDisplay.instance = Factory.HotkeysDisplay()
+        HotkeysDisplay.instance.open()
+
 
 class SudokuSolverApp(App):
     # Config Properties
@@ -653,9 +673,12 @@ class SudokuSolverApp(App):
         self.board.reset()
         for pos, tile in self.board.tiles.items():
             val = tile.value
-            Tile.tiles[pos].label.text = str(val) if val else ''
-            Tile.tiles[pos].label.color = self.text_color
-            Tile.tiles[pos].input.text = ''
+            _tile = Tile.tiles[pos]
+            _tile.label.text = str(val) if val else ''
+            _tile.label.color = self.text_color
+            _tile.input.text = ''
+            for guess in _tile.guesses.labels.values():
+                guess.opacity = 0
 
     def on_stop(self):
         # The Kivy event loop is about to stop, set a stop signal;

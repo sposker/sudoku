@@ -68,8 +68,6 @@ class HotKeyboard:
         if modifiers is None:
             modifiers = []
 
-        print(*keycode, *modifiers)
-
         callback, args = self.resolve_modifiers(keycode[0], sorted(modifiers))
         return callback(args)
 
