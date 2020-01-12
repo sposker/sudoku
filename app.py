@@ -20,7 +20,7 @@ from kivy.uix.spinner import Spinner
 from kivy.uix.textinput import TextInput
 from kivy.uix.togglebutton import ToggleButton
 
-from classes import Board
+from classes import Board, BoardTile
 from database import Database
 from hotkeys import HotKeyboard
 from __init__ import *
@@ -33,6 +33,9 @@ ELEMENT_COLOR = (0.21176470588235294, 0.2235294117647059, 0.25882352941176473, 1
 LIGHT_HIGHLIGHT = (0.39215686274509803, 0.396078431372549, 0.41568627450980394, 1)  # Lighter Gray
 TEXT_COLOR = (0.6705882352941176, 0.6705882352941176, 0.6705882352941176, 1)  # Lightest Gray
 APP_COLORS = [DARK_HIGHLIGHT, BACKGROUND_COLOR, ELEMENT_COLOR, LIGHT_HIGHLIGHT, TEXT_COLOR]
+
+RED = (.6, .1, .1, 1)
+GREEN = (.1, .6, .1, 1)
 
 ITEM_ROW_HEIGHT = 72
 TEXT_BASE_SIZE = 30
@@ -57,7 +60,8 @@ class TaskButton(ButtonBehavior, Image):
     def register_callbacks(self, _):
         """Assign callbacks to buttons *after* app has been built"""
         app = App.get_running_app()
-        self.buttons['Solve'] = app.root.start_second_thread
+        # self.buttons['Solve'] = app.root.start_second_thread
+        self.buttons['Solve'] = app.solve
         self.buttons['Reset'] = app.reset
         self.buttons['Open Puzzle'] = app.root.puzzle_picker
         self.buttons['Random'] = PuzzlePicker.random
@@ -112,7 +116,7 @@ class ToggleLayout(FloatLayout):
         for pos in conflicts:
             tile = Tile.tiles[pos]
             tile.locked = False if tile.locked == 'soft' else 'hard'
-            tile.label.color = (.6, .1, .1, 1)
+            tile.label.color = RED
         Tile.conflicts = conflicts
 
     @staticmethod
@@ -168,11 +172,14 @@ class Tile(RelativeLayout):
     """Tile holding various widgets for sudoku tile functionality"""
 
     tiles = {}
-    conflicts = None
+    conflicts = set()
 
     def __init__(self, position, **kwargs):
         self.locked = False
         self.grid_position = position
+        self.col, self.row = self.grid_position
+        self._neighbors = None
+
         if position[0] in [0, 8] or position[1] in [0, 8]:
             self.on_border = True
         else:
@@ -190,18 +197,36 @@ class Tile(RelativeLayout):
         self.input.bind(focus=lambda x, y: self.input.on_focus)
         self.add_widget(self.input)
 
-        self.label = TileLabel(size_hint=(.95, .95),
-                               # pos_hint={'x': 0.025, 'y': 0},
-                               )
+        self.label = TileLabel(size_hint=(.95, .95))
         self.add_widget(self.label)
 
-        self.guesses = TileGuesses(size_hint=(.95, .95),
-                                   # pos_hint={'x': 0.025, 'y': 0.025},
-                                   )
+        self.guesses = TileGuesses(size_hint=(.95, .95))
         self.add_widget(self.guesses)
 
     def __str__(self):
-        return f'Tile object at position ({self.grid_position[0]}, {self.grid_position[1]}).'
+        return f'Tile object at position ({self.col}, {self.row}).'
+
+    @property
+    def neighbors(self):
+        if not self._neighbors:
+            self._neighbors = {self.find_neighbors(tile) for tile in self.tiles.values()}
+            self._neighbors.remove(None)
+        return self._neighbors
+
+    def find_neighbors(self, tile):
+
+        if (self.row == tile.row or
+                self.col == tile.col or
+                self.parent == tile.parent):
+
+            return tile
+
+    def display_conflicts(self, conflicts):
+        Tile.conflicts = self.conflicts | conflicts
+        for pos in self.conflicts:
+            print(pos)
+            tile = self.tiles[pos]
+            tile.label.color = .6, .1, .1, 1
 
 
 class TileGuesses(GridLayout):
@@ -216,7 +241,7 @@ class TileGuesses(GridLayout):
                            opacity=0)
             self.add_widget(_label)
             self.labels[i + 48] = _label  # +48 matches 1-9 keycodes
-            self.labels[i + 256] = _label  # +256 matches numpad keycodes•
+            self.labels[i + 256] = _label  # +256 matches numpad keycodes
 
     def toggle_opacity(self, val):
         label = self.labels[int(val)]
@@ -225,17 +250,32 @@ class TileGuesses(GridLayout):
         else:
             label.opacity = 0.
 
+    def inspect(self):
+        visible = {label for label in self.labels.values() if label.opacity == 1}
+
+        if not visible:
+            return None
+
+        values = {str(tile.value) for tile in self.parent.neighbors}
+
+        for label in visible:
+            if label.text in values:
+                label.strikethrough = True
+                label.color = ELEMENT_COLOR
+
 
 class TileInput(TextInput, HotKeyboard):
-    """Widget that allows setting values"""
+    """Widget that allows setting values.
+        Hotkey behaviors are inherited from class defined in hotkeys.py
+        """
 
     pat = re.compile('[^1-9]')
     app = None
 
     def __init__(self, **kwargs):
         self.locked = False
-        if not self.app:
-            self.app = App.get_running_app()
+        if not TileInput.app:
+            TileInput.app = App.get_running_app()
         super().__init__(**kwargs)
 
     def keyboard_on_key_down(self, window, keycode, text, modifiers):
@@ -275,21 +315,19 @@ class TileInput(TextInput, HotKeyboard):
             self.locked = self.parent.locked = 'soft'
         conflicts = self.app.update_board(self.parent.grid_position, self.text)
         if conflicts:
-            Tile.conflicts = conflicts
-            for pos in conflicts:
-                tile = Tile.tiles[pos]
-                tile.label.color = .6, .1, .1, 1
+            self.parent.display_conflicts(conflicts)
 
     def _unbind_keyboard(self):
         self.set_text(self.text)
         super()._unbind_keyboard()
 
-        if Tile.conflicts:
-            print(Tile.conflicts)
-            to_remove = {self.app.resolve_conflicts(pos) for pos in Tile.conflicts}
-            for elem in to_remove:
-                if elem in Tile.conflicts:
-                    Tile.conflicts.remove(elem)
+        if self.inspections and self.conflicts:
+            to_remove = {self.app.resolve_conflicts(pos) for pos in self.conflicts}
+            for pos in to_remove:
+                if pos in self.conflicts:
+                    Tile.conflicts.remove(pos)
+                    tile = Tile.tiles[pos]
+                    tile.label.color = TEXT_COLOR
 
     def _trigger_guides(self):
         NineBy.instance.trigger_guides(self.parent.grid_position)
@@ -299,6 +337,14 @@ class TileInput(TextInput, HotKeyboard):
 
     def get_focus_previous(self):
         return self.hotkey_focus_previous()
+
+    @property
+    def conflicts(self):
+        return Tile.conflicts
+
+    @property
+    def inspections(self):
+        return App.get_running_app().inspections
 
 
 class TileLabel(Label):
@@ -441,6 +487,7 @@ class NineBy(FloatLayout):
 
     # noinspection PyMethodMayBeStatic
     def _recolor_tile(self, tile, value):
+        """Recolors tile backgrounds for guides"""
         tile.opacity = value
 
     def _trigger_guides(self, pos):
@@ -590,7 +637,6 @@ class SudokuSolverApp(App):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.inspections = False
-        self.solve_iter_count = 0
         self.db = Database()
         self.board = Board(puzzle=self.db.blank_puzzle)
 
@@ -612,8 +658,10 @@ class SudokuSolverApp(App):
             return self.board.validate(tile)
 
     def resolve_conflicts(self, pos):
-        tile = self.board.tiles[pos]
-        conflicts = self.board.validate(tile)
+        _tile = self.board.tiles[pos]
+        conflicts = self.board.validate(_tile)
+        tile = Tile.tiles[pos]
+        tile.guesses.inspect()
         if not conflicts:
             print('not conflicts')
             label = Tile.tiles[pos].label
@@ -625,30 +673,26 @@ class SudokuSolverApp(App):
         for pos, tile in self.board.tiles.items():
             val = tile.value
             Tile.tiles[pos].label.text = str(val)
-            Tile.tiles[pos].label.color = (.1, .6, .1, 1)
+            Tile.tiles[pos].label.color = GREEN
             Tile.tiles[pos].input.text = str(val)
 
     def slow_solve(self):
-
         tiles = self.board.reset()
-        self.solve_iter_count = 0
         self._slow_solve(tiles)
-        print(self.solve_iter_count)
 
     def find_hint(self):
         pos = self.board.generate_hint()
         tile = Tile.tiles[pos]
-        tile.label.color = [(.6, .3, .3, 1)]
+        # tile.label.color =
 
     def _slow_solve(self, tiles):
 
         tile = tiles.pop()
         label = Tile.tiles[tile.position].label
-        label.color = (.1, .6, .1, 1)
+        label.color = GREEN
 
         for i in range(1, 10):
             self.root.update_values()
-            self.solve_iter_count += 1
             print(i)  # For whatever reason, printing gives the window time to update itself, so don't remove this
 
             tile.value = i
@@ -663,7 +707,7 @@ class SudokuSolverApp(App):
                     if x:
                         return x
                     else:
-                        label.color = (.1, .6, .1, 1)
+                        label.color = GREEN
 
         else:
             tile.value = None

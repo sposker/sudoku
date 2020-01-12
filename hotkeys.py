@@ -211,6 +211,8 @@ class HotKeyboard:
 
     def hotkey_next_focus(self, _):
 
+        print(_)
+
         next_x, next_y = self._calculate_next_focus(*self.parent.grid_position)
         _next = self.parent.tiles[(next_x, next_y)]
 

@@ -36,11 +36,45 @@ class Puzzle:
 
 class BoardTile:
 
-    def __init__(self, position, value=None, locked=False):
+    def __init__(self, position, board, value=None, locked=False):
         self.position = position
+        self.board = board
         self.value = value
         self.locked = locked
-        self.possibles = []
+        self._neighbors = None
+        self._group = None
+
+    @property
+    def row(self):
+        return self.position[1]
+
+    @property
+    def col(self):
+        return self.position[0]
+
+    @property
+    def group(self):
+        if self._group is None:
+            for name, members in Board.sections.items():
+                if self.position in members:
+                    self._group = name
+                    break
+        return self._group
+
+    @property
+    def neighbors(self):
+        if self._neighbors is None:
+            self._neighbors = {self.find_neighbors(tile) for tile in self.board.tiles.values()}
+            self._neighbors.remove(None)
+            self._neighbors.remove(self)
+        return self._neighbors
+
+    def find_neighbors(self, tile):
+
+        if self.row == tile.row or \
+                self.col == tile.col or \
+                self.group == tile.group:
+            return tile
 
 
 class Board:
@@ -71,7 +105,7 @@ class Board:
         self.tiles = {}
         for col in range(9):
             for row in range(9):
-                self.tiles[(col, row)] = BoardTile((col, row))
+                self.tiles[(col, row)] = BoardTile((col, row), self)
 
         if puzzle:
             for k, v in puzzle.items():
@@ -129,40 +163,52 @@ class Board:
     def build(self):  # TODO
         ...
 
-    def validate(self, tile) -> set:
-        return self._check_linear(tile) | self._check_box(tile)
+    @staticmethod
+    def validate(tile) -> set:
+        conflicts = set()
+        if tile.value is None:
+            return conflicts
+
+        for n in tile.neighbors:
+            if n.value == tile.value and tile.value is not None:
+                conflicts.add(n.position)
+
+        if conflicts:
+            conflicts.add(tile.position)
+
+        return conflicts
 
     def _generate_puzzle(self):
         self.reset()
         return ...
 
-    def _check_linear(self, tile):
-        if tile.value is None:
-            return set()
-        col, row = tile.position
-        others = [self.tiles[(_col, row)] for _col in range(9) if _col != col] + \
-                 [self.tiles[(col, _row)] for _row in range(9) if _row != row]
-        matches = set()
-        for other in others:
-            if tile.value == other.value:
-                matches.add(tile.position)
-                matches.add(other.position)
-        return matches
-
-    # noinspection PyUnboundLocalVariable
-    def _check_box(self, tile):
-        if tile.value is None:
-            return set()
-        pos = tile.position
-        for positions in self.sections.values():
-            if pos in positions:
-                others = [self.tiles[_pos] for _pos in positions if _pos != pos]
-        matches = set()
-        for other in others:
-            if tile.value == other.value:
-                matches.add(tile.position)
-                matches.add(other.position)
-        return matches
+    # def _check_linear(self, tile):
+    #     if tile.value is None:
+    #         return set()
+    #     col, row = tile.position
+    #     others = [self.tiles[(_col, row)] for _col in range(9) if _col != col] + \
+    #              [self.tiles[(col, _row)] for _row in range(9) if _row != row]
+    #     matches = set()
+    #     for other in others:
+    #         if tile.value == other.value:
+    #             matches.add(tile.position)
+    #             matches.add(other.position)
+    #     return matches
+    #
+    # # noinspection PyUnboundLocalVariable
+    # def _check_box(self, tile):
+    #     if tile.value is None:
+    #         return set()
+    #     pos = tile.position
+    #     for positions in self.sections.values():
+    #         if pos in positions:
+    #             others = [self.tiles[_pos] for _pos in positions if _pos != pos]
+    #     matches = set()
+    #     for other in others:
+    #         if tile.value == other.value:
+    #             matches.add(tile.position)
+    #             matches.add(other.position)
+    #     return matches
 
     def generate_hint(self):
         empties = {tile for tile in self.tiles.values() if tile.value is None}
