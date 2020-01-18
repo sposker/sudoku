@@ -1,3 +1,6 @@
+from hints import Hint
+
+
 class Puzzle:
 
     grid = []
@@ -41,39 +44,61 @@ class BoardTile:
         self.board = board
         self.value = value
         self.locked = locked
-        self._neighbors = None
-        self._group = None
+        self.is_paired = False
+        self._all_neighbors = set()
+        self._row_neighbors = set()
+        self._col_neighbors = set()
+        self._box_neighbors = set()
+        self._box = None
+
+    def __hash__(self):
+        return hash(repr(self))
 
     @property
     def row(self):
         return self.position[1]
 
     @property
+    def row_neighbors(self):
+        return self._row_neighbors
+
+    @property
     def col(self):
         return self.position[0]
 
     @property
-    def group(self):
-        if self._group is None:
+    def col_neighbors(self):
+        return self._col_neighbors
+
+    @property
+    def box(self):
+        if not self._box:
             for name, members in Board.sections.items():
                 if self.position in members:
-                    self._group = name
+                    self._box = name
                     break
-        return self._group
+        return self._box
+
+    @property
+    def box_neighbors(self):
+        return self._box_neighbors
 
     @property
     def neighbors(self):
-        if self._neighbors is None:
-            self._neighbors = {self.find_neighbors(tile) for tile in self.board.tiles.values()}
-            self._neighbors.remove(None)
-            self._neighbors.remove(self)
-        return self._neighbors
+        if not self._all_neighbors:
+            self._all_neighbors = {self.find_neighbors(tile) for tile in self.board.tiles.values()}
+            self._all_neighbors.remove(self)
+            self._all_neighbors.remove(None)
+        return self._all_neighbors
 
     def find_neighbors(self, tile):
-
-        if self.row == tile.row or \
-                self.col == tile.col or \
-                self.group == tile.group:
+        do_return = False
+        for attr in ['row', 'col', 'box']:
+            if getattr(self, attr) == getattr(tile, attr):
+                neighbors = getattr(self, f'_{attr}_neighbors')
+                neighbors.add(tile)
+                do_return = True
+        if do_return:
             return tile
 
 
@@ -164,13 +189,14 @@ class Board:
         ...
 
     @staticmethod
-    def validate(tile) -> set:
+    def validate(tile, value=None) -> set:
+        value = tile.value if value is None else value
         conflicts = set()
-        if tile.value is None:
+        if value is None:  # Tile's actual value is None
             return conflicts
 
         for n in tile.neighbors:
-            if n.value == tile.value and tile.value is not None:
+            if n.value == value:
                 conflicts.add(n.position)
 
         if conflicts:
@@ -182,51 +208,13 @@ class Board:
         self.reset()
         return ...
 
-    # def _check_linear(self, tile):
-    #     if tile.value is None:
-    #         return set()
-    #     col, row = tile.position
-    #     others = [self.tiles[(_col, row)] for _col in range(9) if _col != col] + \
-    #              [self.tiles[(col, _row)] for _row in range(9) if _row != row]
-    #     matches = set()
-    #     for other in others:
-    #         if tile.value == other.value:
-    #             matches.add(tile.position)
-    #             matches.add(other.position)
-    #     return matches
-    #
-    # # noinspection PyUnboundLocalVariable
-    # def _check_box(self, tile):
-    #     if tile.value is None:
-    #         return set()
-    #     pos = tile.position
-    #     for positions in self.sections.values():
-    #         if pos in positions:
-    #             others = [self.tiles[_pos] for _pos in positions if _pos != pos]
-    #     matches = set()
-    #     for other in others:
-    #         if tile.value == other.value:
-    #             matches.add(tile.position)
-    #             matches.add(other.position)
-    #     return matches
-
     def generate_hint(self):
-        empties = {tile for tile in self.tiles.values() if tile.value is None}
-        for tile in empties:
-            results = []
-            for val in range(1, 10):
-                tile.value = val
-                results.append(self.validate(tile))
-
-            if results.count(set()) == 1:
-                tile.value = results.index(set())
-                break
-            else:
-                tile.value = None
+        h = Hint(self)
+        if h.hint:
+            return h.hint
         else:
-            print("no hint found")
-            return
-        return tile.grid_position
+            h = Hint(self)
+            return h.hint
 
 
 

@@ -77,8 +77,8 @@ class TaskButton(ButtonBehavior, Image):
             callback()
         except AttributeError:
             print(f'No callback present for <{button_text}>.')
-        except KeyError:
-            print(f'No key present for <{button_text}>.')
+        # except KeyError:
+        #     print(f'No key present for <{button_text}>.')
 
 
 class TaskButtonLayout(FloatLayout):
@@ -114,18 +114,18 @@ class ToggleLayout(FloatLayout):
             conflicts.remove(None)
 
         for pos in conflicts:
-            tile = Tile.tiles[pos]
+            tile = TileGroup.tiles[pos]
             tile.locked = False if tile.locked == 'soft' else 'hard'
             tile.label.color = RED
-        Tile.conflicts = conflicts
+        TileGroup.conflicts = conflicts
 
     @staticmethod
     def inspections_off():
         app = App.get_running_app()
         setattr(app, 'inspections', False)
-        for tile in Tile.tiles.values():
+        for tile in TileGroup.tiles.values():
             tile.label.color = app.text_color
-        Tile.conflicts = None
+        TileGroup.conflicts = None
 
 
 class PanelToggle(ToggleButton):
@@ -168,25 +168,30 @@ class GuideLabel(Label):
         self.grid_position = pos
 
 
-class Tile(RelativeLayout):
+class TileGroup(RelativeLayout):
     """Tile holding various widgets for sudoku tile functionality"""
 
     tiles = {}
     conflicts = set()
 
-    def __init__(self, position, **kwargs):
+    def __init__(self, position, boardtile, **kwargs):
         self.locked = False
         self.grid_position = position
-        self.col, self.row = self.grid_position
-        self._neighbors = None
+        self._all_neighbors = set()
+        self._row_neighbors = set()
+        self._col_neighbors = set()
+        self._box_neighbors = set()
+        self._box = None
+        self.boardtile = boardtile
 
         if position[0] in [0, 8] or position[1] in [0, 8]:
             self.on_border = True
         else:
             self.on_border = False
+
         super().__init__(**kwargs)
 
-        Tile.tiles[self.grid_position] = self
+        TileGroup.tiles[self.grid_position] = self
 
         self.background = TileBackground(size_hint=(.95, .95))
         self.add_widget(self.background)
@@ -203,26 +208,11 @@ class Tile(RelativeLayout):
         self.guesses = TileGuesses(size_hint=(.95, .95))
         self.add_widget(self.guesses)
 
-    def __str__(self):
-        return f'Tile object at position ({self.col}, {self.row}).'
-
-    @property
-    def neighbors(self):
-        if not self._neighbors:
-            self._neighbors = {self.find_neighbors(tile) for tile in self.tiles.values()}
-            self._neighbors.remove(None)
-        return self._neighbors
-
-    def find_neighbors(self, tile):
-
-        if (self.row == tile.row or
-                self.col == tile.col or
-                self.parent == tile.parent):
-
-            return tile
+    # def __str__(self):
+    #     return f'Tile object at position ({self.col}, {self.row}).'
 
     def display_conflicts(self, conflicts):
-        Tile.conflicts = self.conflicts | conflicts
+        TileGroup.conflicts = self.conflicts | conflicts
         for pos in self.conflicts:
             print(pos)
             tile = self.tiles[pos]
@@ -325,8 +315,8 @@ class TileInput(TextInput, HotKeyboard):
             to_remove = {self.app.resolve_conflicts(pos) for pos in self.conflicts}
             for pos in to_remove:
                 if pos in self.conflicts:
-                    Tile.conflicts.remove(pos)
-                    tile = Tile.tiles[pos]
+                    TileGroup.conflicts.remove(pos)
+                    tile = TileGroup.tiles[pos]
                     tile.label.color = TEXT_COLOR
 
     def _trigger_guides(self):
@@ -340,7 +330,7 @@ class TileInput(TextInput, HotKeyboard):
 
     @property
     def conflicts(self):
-        return Tile.conflicts
+        return TileGroup.conflicts
 
     @property
     def inspections(self):
@@ -357,6 +347,7 @@ class ThreeBy(RelativeLayout):
     def __init__(self, grid_pos, **kwargs):
         self.grid_pos = grid_pos
         self._h_offset, self._v_offset = 3 * grid_pos[0], 3 * grid_pos[1]
+        self.app = App.get_running_app()
         super().__init__(**kwargs)
 
     def make_tiles(self, **_):
@@ -364,18 +355,19 @@ class ThreeBy(RelativeLayout):
             for horiz in range(3):
                 coords = (self._h_offset + horiz, self._v_offset + vert)
 
-                tile = Tile(coords,
-                            size_hint=(.33, .33),
-                            pos_hint={'x': horiz / 3, 'y': vert / 3},
-                            )
+                boardtile = self.app.board.tiles[coords]
+                tile = TileGroup(coords,
+                                 boardtile,
+                                 size_hint=(.33, .33),
+                                 pos_hint={'x': horiz / 3, 'y': vert / 3},
+                                 )
 
                 self.add_widget(tile)
 
     def populate_tiles(self):
-        app = App.get_running_app()
         for tile in self.children:
             try:
-                value = app.board[tile.grid_position]
+                value = self.app.board[tile.grid_position]
             except KeyError:
                 value = None
 
@@ -416,6 +408,9 @@ class NineBy(FloatLayout):
                 pass
         groups = self._create_guide_groups()
         self._set_guide_groups(*groups)
+
+        for tile in TileGroup.tiles.values():
+            _ = tile.boardtile.neighbors
 
     @staticmethod
     def _create_guide_groups():
@@ -535,7 +530,7 @@ class Main(FloatLayout):
     @mainthread
     def stop_test(self):
         print('Solved!')
-        for tile in Tile.tiles.values():
+        for tile in TileGroup.tiles.values():
             tile.label.color = (.1, .6, .1, 1)
 
     @mainthread
@@ -543,7 +538,7 @@ class Main(FloatLayout):
         app = App.get_running_app()
         board = app.board
         for pos, _tile in board.tiles.items():
-            tile = Tile.tiles[pos]
+            tile = TileGroup.tiles[pos]
             tile.label.text = str(_tile.value) if _tile.value else ''
 
     @staticmethod
@@ -631,7 +626,6 @@ class SudokuSolverApp(App):
     text_size = TEXT_BASE_SIZE
 
     hint_text_color = (0.6705882352941176, 0.6705882352941176, 0.6705882352941176, .1)
-    board = {}
     tile_inputs = {}
 
     def __init__(self, **kwargs):
@@ -660,11 +654,11 @@ class SudokuSolverApp(App):
     def resolve_conflicts(self, pos):
         _tile = self.board.tiles[pos]
         conflicts = self.board.validate(_tile)
-        tile = Tile.tiles[pos]
+        tile = TileGroup.tiles[pos]
         tile.guesses.inspect()
         if not conflicts:
             print('not conflicts')
-            label = Tile.tiles[pos].label
+            label = TileGroup.tiles[pos].label
             label.color = self.text_color
             return pos
 
@@ -672,23 +666,28 @@ class SudokuSolverApp(App):
         self.board.solve()
         for pos, tile in self.board.tiles.items():
             val = tile.value
-            Tile.tiles[pos].label.text = str(val)
-            Tile.tiles[pos].label.color = GREEN
-            Tile.tiles[pos].input.text = str(val)
+            TileGroup.tiles[pos].label.text = str(val)
+            TileGroup.tiles[pos].label.color = GREEN
+            TileGroup.tiles[pos].input.text = str(val)
 
     def slow_solve(self):
         tiles = self.board.reset()
         self._slow_solve(tiles)
 
     def find_hint(self):
-        pos = self.board.generate_hint()
-        tile = Tile.tiles[pos]
-        # tile.label.color =
+        try:
+            pos, val = self.board.generate_hint()
+        except TypeError:
+            print("Program more hints")
+        else:
+            tile = TileGroup.tiles[pos]
+            tile.input.focus = True
+            tile.input.text = '\u2022'
 
     def _slow_solve(self, tiles):
 
         tile = tiles.pop()
-        label = Tile.tiles[tile.position].label
+        label = TileGroup.tiles[tile.position].label
         label.color = GREEN
 
         for i in range(1, 10):
@@ -717,7 +716,7 @@ class SudokuSolverApp(App):
         self.board.reset()
         for pos, tile in self.board.tiles.items():
             val = tile.value
-            _tile = Tile.tiles[pos]
+            _tile = TileGroup.tiles[pos]
             _tile.label.text = str(val) if val else ''
             _tile.label.color = self.text_color
             _tile.input.text = ''
